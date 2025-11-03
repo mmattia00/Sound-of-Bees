@@ -54,7 +54,7 @@ def apply_window(signal, window_type='hamming'):
         window = np.ones(len(signal))
     return signal * window
 
-def apply_lowpass_filter(signal, sr, cutoff_hz=1000):
+def apply_lowpass_filter(signal, sr, cutoff_hz=15000):
     nyquist = sr / 2
     normalized_cutoff = cutoff_hz / nyquist
     if normalized_cutoff >= 1:
@@ -63,9 +63,19 @@ def apply_lowpass_filter(signal, sr, cutoff_hz=1000):
     filtered_signal = filtfilt(b, a, signal)
     return filtered_signal
 
+def apply_highpass_filter(signal, sr, cutoff_hz=2500):
+    nyquist = sr / 2
+    normalized_cutoff = cutoff_hz / nyquist
+    if normalized_cutoff >= 1:
+        normalized_cutoff = 0.99
+    b, a = butter(4, normalized_cutoff, btype='high')
+    filtered_signal = filtfilt(b, a, signal)
+    return filtered_signal
+
 def apply_preprocessing(signal, sr):
-    # Applica filtro low-pass a 3500 Hz
-    preprocessed_signal = apply_lowpass_filter(signal, sr, cutoff_hz=3500)
+    # Applica filtro low-pass a 15k Hz
+    preprocessed_signal = apply_lowpass_filter(signal, sr, cutoff_hz=15000)
+    preprocessed_signal = apply_highpass_filter(preprocessed_signal, sr, cutoff_hz=2500)
     return preprocessed_signal
 
 
@@ -177,22 +187,27 @@ def plot_hnr_analysis(results, ch_num, peaks=None, peak_windows=None, threshold=
 
 
 
-
-def find_peaks_adaptive(hnr_values, time_centers, k=1.5):
+def find_peaks_percentile(hnr_values, time_centers, percentile=99, offset=2):
     """
-    method: median + MAD
+    Rileva outlier usando un percentile alto della distribuzione.
+    
+    Args:
+        percentile: soglia percentile (95-99 per outlier veri)
+        offset: margine aggiuntivo sopra il percentile in dB
     """
     hnr = np.array(hnr_values, dtype=float)
     valid = hnr[~np.isnan(hnr)]
     
-    med = np.median(valid)
-    mad = np.median(np.abs(valid - med))
-    threshold = med + k * mad
-
-    above_threshold = hnr >= threshold
-    peaks_idx = np.where(above_threshold)[0]
-    print(f"Metodo: Median + MAD | Threshold: {threshold:.2f} dB | Picchi trovati: {len(peaks_idx)}")
-    return peaks_idx, time_centers[peaks_idx], threshold
+    # Base sulla distribuzione
+    percentile_value = np.percentile(valid, percentile)
+    threshold = percentile_value + offset
+    
+    peaks, _ = find_peaks(hnr, height=threshold)
+    
+    print(f"Metodo: Percentile-based | {percentile}° percentile={percentile_value:.2f} dB")
+    print(f"Threshold: {threshold:.2f} dB | Picchi trovati: {len(peaks)}")
+    
+    return peaks, time_centers[peaks], threshold
 
 def merge_overlapping_windows(peak_windows, peaks, peaks_times):
     """
@@ -285,7 +300,9 @@ def save_whoop_candidate(segment, sr, audio_filename, channel, peak_time, start_
 
 if __name__ == "__main__":
     # Cartella contenente i file audio
-    audio_folder = "D:\soundofbees"
+    raw_audio_folder = "D:\soundofbees"
+    candidates_folder = "whooping_candidates"
+    starting_audiofile_name = "audio_recording_2025-09-15T13_57_49.409772Z.wav"
     
     # Parametri analysis
     window_length_ms = 50
@@ -293,7 +310,6 @@ if __name__ == "__main__":
     f0_min = 250
     f0_max = 700
     window_type = 'hamming'
-    k = 4.5
     playback_window_sec = 3
     
     # Canali rotti
@@ -305,10 +321,22 @@ if __name__ == "__main__":
     print("="*80)
     
     # Trova tutti i file .wav nella cartella
-    audio_files = sorted([f for f in os.listdir(audio_folder) if f.endswith('.wav')])
+    audio_files = sorted([f for f in os.listdir(raw_audio_folder) if f.endswith('.wav')])
     
+    # Trova l’indice dell audio file di partenza
+    try:
+        start_index = audio_files.index(starting_audiofile_name)
+    except ValueError:
+        start_index = -1
+
+    # Prendi tutti i file successivi
+    if start_index != -1:
+        audio_files = audio_files[start_index:]
+    
+
+
     if not audio_files:
-        print("Nessun file .wav trovato in " + audio_folder)
+        print("Nessun file .wav trovato in " + raw_audio_folder)
         exit(1)
     
     print("Trovati " + str(len(audio_files)) + " file audio")
@@ -316,7 +344,7 @@ if __name__ == "__main__":
     
     # Processa ogni file
     for file_idx, audio_filename in enumerate(audio_files, 1):
-        audio_file = os.path.join(audio_folder, audio_filename)
+        audio_file = os.path.join(raw_audio_folder, audio_filename)
         
         print("\n[" + str(file_idx) + "/" + str(len(audio_files)) + "] Processing: " + audio_filename)
         print("-" * 80)
@@ -337,7 +365,7 @@ if __name__ == "__main__":
             if j in channel_broken:
                 continue
             
-            print("  CHANNEL " + str(j).zfill(2), end=" ")
+            print("  CHANNEL " + str(j+1).zfill(2), end=" ")
             
             try:
                 signal = signal_multichannel[:, j]
@@ -359,10 +387,11 @@ if __name__ == "__main__":
                 smoothed_results = apply_postprocessing(results, smoothing_window=5)
                 
                 # Peak detection
-                peaks, peak_times, threshold = find_peaks_adaptive(
+                peaks, peak_times, threshold = find_peaks_percentile(
                     smoothed_results['hnr_smoothed'],
                     smoothed_results['time_centers'],
-                    k=k
+                    percentile=99.5,
+                    offset=4
                 )
                 
                 # Crea finestre
@@ -393,22 +422,22 @@ if __name__ == "__main__":
                             segment=segment,
                             sr=sr,
                             audio_filename=audio_file,
-                            channel=j,
+                            channel=j+1,
                             peak_time=peak_times[i],
                             start_time=start_time,
                             end_time=end_time,
-                            output_dir="whooping_candidates"
+                            output_dir=candidates_folder
                         )
 
-                        # # Optional playback
-                        # print("   - Riproduzione segmento...")
-                        # sd.play(segment, sr)
-                        # sd.wait()
-                        # # aspetta mezzo secondo prima di continuare
-                        # sd.sleep(500)
+                        # Optional playback
+                        print(f"   - Riproduzione segmento centered in {peak_times[i]:.3f}")
+                        sd.play(segment, sr)
+                        sd.wait()
+                        # aspetta mezzo secondo prima di continuare
+                        sd.sleep(500)
                 
-                # # Plot (opzionale - commenta se vuoi velocità)
-                # plot_hnr_analysis(smoothed_results, j, peaks, peak_windows, threshold)
+                # Plot (opzionale - commenta se vuoi velocità)
+                plot_hnr_analysis(smoothed_results, j+1, peaks, peak_windows, threshold)
                 
             except Exception as e:
                 print("Errore: " + str(e))
