@@ -10,7 +10,7 @@ print(f"Current working directory: {os.getcwd()}")
 
 
 base_folder = "sounds/whoop_candidates"
-starting_audiofile_name = "audio_recording_2025-09-15T06_52_43.336973Z"
+starting_audiofile_name = "audio_recording_2025-09-15T07_34_43.348153Z"
 whoop_folder = "sounds/whoop"
 weird_sounds_folder = "sounds/weird_sounds"
 whoop_spec_folder = "figures/whoop_spectrograms"
@@ -65,21 +65,10 @@ def compute_spectrogram(data, samplerate):
     return frequencies, times, spectrogram_db
 
 
-def plot_spectrogram_from_data(frequencies, times, spectrogram_db, title="Spectrogram"):
+def plot_spectrogram_from_data(frequencies, times, spectrogram_db, vmin, vmax,title="Spectrogram"):
     """Visualizza uno spettrogramma già calcolato"""
     plt.figure(figsize=(12, 6))
-    
-    # Visualizza con intervallo di 80 dB
-    vmin = np.nanmax(spectrogram_db) - 80
-    vmax = np.nanmax(spectrogram_db)
-
-    print(vmin, vmax)
-
-    # vmax = np.percentile(spectrogram_db, 99)
-    # dynamic_range = 60  # prova 60 dB; puoi ridurre a 50 se vuoi ancora più contrasto
-    # vmin = vmax - dynamic_range
-
-    
+  
     im = plt.pcolormesh(times, frequencies, spectrogram_db, 
                         shading='gouraud', cmap='hot', vmin=vmin, vmax=vmax)
     
@@ -95,18 +84,10 @@ def plot_spectrogram_from_data(frequencies, times, spectrogram_db, title="Spectr
     plt.pause(0.1)
 
 
-def save_spectrogram_from_data(frequencies, times, spectrogram_db, output_path):
+def save_spectrogram_from_data(frequencies, times, spectrogram_db, output_path, vmin, vmax):
     """Salva uno spettrogramma già calcolato"""
     plt.figure(figsize=(12, 6))
     
-    vmin = np.nanmax(spectrogram_db) - 80
-    vmax = np.nanmax(spectrogram_db)
-
-    # print(vmin, vmax)
-
-    # vmax = np.percentile(spectrogram_db, 99)
-    # dynamic_range = 60  # prova 60 dB; puoi ridurre a 50 se vuoi ancora più contrasto
-    # vmin = vmax - dynamic_range
         
     im = plt.pcolormesh(times, frequencies, spectrogram_db, 
                         shading='gouraud', cmap='hot', vmin=vmin, vmax=vmax)
@@ -159,57 +140,65 @@ if __name__ == "__main__":
             print("Computing spectrogram...")
             # Calcola lo spettrogramma UNA SOLA VOLTA
             frequencies, times, spectrogram_db = compute_spectrogram(data, samplerate)
+
+            vmin = np.nanmax(spectrogram_db) - 80
+            vmax = np.nanmax(spectrogram_db)
+            print(vmin, vmax)
+
+            if(vmin > -200):
             
-            # Visualizza lo spettrogramma (non bloccante)
-            plot_spectrogram_from_data(frequencies, times, spectrogram_db, 
-                                    title=f"Candidate: {candidate}")
-            
-            # Riproduci l'audio in thread separato (non bloccante)
-            play_audio(data, samplerate)
-            
-            # Chiedi all'utente
-            user_input = input(f"Is this a whoop (1), a weird sound (2) or noise (3) or skip all the remaining channels (4), play again (5)? ").strip().lower()
-            
-            # Chiudi la finestra del grafico
-            plt.close('all')
-            
-            while user_input == '5':
-                # Riproduci di nuovo l'audio
+                # Visualizza lo spettrogramma (non bloccante)
+                plot_spectrogram_from_data(frequencies, times, spectrogram_db,  vmin, vmax,title=f"Candidate: {candidate}")
+                
+                # Riproduci l'audio in thread separato (non bloccante)
                 play_audio(data, samplerate)
+                
+                # Chiedi all'utente
                 user_input = input(f"Is this a whoop (1), a weird sound (2) or noise (3) or skip all the remaining channels (4), play again (5)? ").strip().lower()
+                
+                # Chiudi la finestra del grafico
                 plt.close('all')
-            
-            if user_input == '1':
-                output_filename = f"{folder}_{candidate}"
-                audio_output_path = os.path.join(whoop_folder, output_filename)
-                spec_output_path = os.path.join(whoop_spec_folder, 
-                                            output_filename.replace('.wav', '.png'))
                 
-                sf.write(audio_output_path, data, samplerate)
-                print(f"✓ Audio saved as: {audio_output_path}")
+                while user_input == '5':
+                    # Riproduci di nuovo l'audio
+                    play_audio(data, samplerate)
+                    user_input = input(f"Is this a whoop (1), a weird sound (2) or noise (3) or skip all the remaining channels (4), play again (5)? ").strip().lower()
+                    plt.close('all')
                 
-                save_spectrogram_from_data(frequencies, times, spectrogram_db, spec_output_path)
-                print(f"✓ Spectrogram saved as: {spec_output_path}")
-                
-            elif user_input == '2':
-                output_filename = f"{folder}_{candidate}"
-                audio_output_path = os.path.join(weird_sounds_folder, output_filename)
-                spec_output_path = os.path.join(weird_spec_folder, 
-                                            output_filename.replace('.wav', '.png'))
-                
-                sf.write(audio_output_path, data, samplerate)
-                print(f"✓ Audio saved as: {audio_output_path}")
-                
-                save_spectrogram_from_data(frequencies, times, spectrogram_db, spec_output_path)
-                print(f"✓ Spectrogram saved as: {spec_output_path}")
-                
-            elif user_input == '3':
-                print("✗ Candidate rejected")
+                if user_input == '1':
+                    output_filename = f"{folder}_{candidate}"
+                    audio_output_path = os.path.join(whoop_folder, output_filename)
+                    spec_output_path = os.path.join(whoop_spec_folder, 
+                                                output_filename.replace('.wav', '.png'))
+                    
+                    sf.write(audio_output_path, data, samplerate)
+                    print(f"✓ Audio saved as: {audio_output_path}")
+                    
+                    save_spectrogram_from_data(frequencies, times, spectrogram_db, spec_output_path, vmin, vmax)
+                    print(f"✓ Spectrogram saved as: {spec_output_path}")
+                    
+                elif user_input == '2':
+                    output_filename = f"{folder}_{candidate}"
+                    audio_output_path = os.path.join(weird_sounds_folder, output_filename)
+                    spec_output_path = os.path.join(weird_spec_folder, 
+                                                output_filename.replace('.wav', '.png'))
+                    
+                    sf.write(audio_output_path, data, samplerate)
+                    print(f"✓ Audio saved as: {audio_output_path}")
+                    
+                    save_spectrogram_from_data(frequencies, times, spectrogram_db, spec_output_path, vmin, vmax)
+                    print(f"✓ Spectrogram saved as: {spec_output_path}")
+                    
+                elif user_input == '3':
+                    print("✗ Candidate rejected")
+                    continue
+                    
+                elif user_input == '4':
+                    print("Skipping all remaining channels.")
+                    break
+            else:
+                print("Signal too weak, skipping candidate.")
                 continue
-                
-            elif user_input == '4':
-                print("Skipping all remaining channels.")
-                break
 
 
     print("\n" + "=" * 80)

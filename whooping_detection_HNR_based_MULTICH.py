@@ -9,7 +9,7 @@ if __name__ == "__main__":
     # Cartella contenente i file audio
     raw_audio_folder = "D:\soundofbees"
     candidates_folder = "sounds\whoop_candidates"
-    starting_audiofile_name = "audio_recording_2025-09-15T06_00_43.664505Z.wav"
+    starting_audiofile_name = "audio_recording_2025-09-15T19_22_49.036144Z.wav" # l'ultimo file processato di quelli presenti nel hard disk in locale
 
     
     # Canali rotti
@@ -110,21 +110,21 @@ if __name__ == "__main__":
                 # detector.peak_times_    -> tempi centrali dei picchi (secondi)
                 # detector.peak_windows_  -> lista di tuple (start_time, end_time)
                 
-                # optional playback
-                # Estrai i segmenti audio
-                segments = detector.extract_segments()
-                for segment in segments:
-                    print(f"   - Riproduzione segmento di {len(segment)/sr:.3f} secondi")
-                    sd.play(segment, sr)
-                    sd.wait()
-                    # aspetta mezzo secondo prima di continuare
-                    sd.sleep(500)
+                # # optional playback
+                # # Estrai i segmenti audio
+                # segments = detector.extract_segments()
+                # for segment in segments:
+                #     print(f"   - Riproduzione segmento di {len(segment)/sr:.3f} secondi")
+                #     sd.play(segment, sr)
+                #     sd.wait()
+                #     # aspetta mezzo secondo prima di continuare
+                #     sd.sleep(500)
                 
                 # Salva i segmenti rilevati
                 detector.save_segments(audio_file, j+1, output_dir=candidates_folder)
                 
-                # Visualizza i risultati
-                detector.plot_analysis(ch_num=j+1)
+                # # Optional: Visualizza i risultati
+                # detector.plot_analysis(ch_num=j+1)
                 
             except Exception as e:
                 print("Errore: " + str(e))
