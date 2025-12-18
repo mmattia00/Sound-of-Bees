@@ -1,3 +1,4 @@
+import re
 from whoop_detector import WhoopDetector
 from harmonics_analyzer import HarmonicsAnalyzer
 from pitch_detector import PitchDetector
@@ -7,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import csv
 from datetime import datetime
+import re
 
 
 def plot_final_visualization(f0_frequencies_final, duration_ms_final, save=False, timestamp=""):
@@ -218,7 +220,7 @@ if __name__ == "__main__":
 
         # Esegui la rilevazione
         detection_results = detector.detect(
-            percentile=80,
+            percentile=95,
             offset=4,
             window_sec=0.7, # lunghezza finestra di analisi intorno al picco
             merge_overlaps=True
@@ -237,11 +239,11 @@ if __name__ == "__main__":
         # Estrai i segmenti audio
         segments = detector.extract_segments()
 
-        for segment_idx, segment in enumerate(segments):
+        detector.plot_analysis()
 
-            # Ottieni l'inizio del segmento nell'audio originale (in campioni)
-            segment_start_time = detector.peak_windows_[segment_idx][0]  # in secondi
-            segment_start_sample = int(segment_start_time * sr)
+
+
+        for segment_idx, segment in enumerate(segments):
 
             pitch_detector = PitchDetector(audio_segment=segment, sr=sr)
 
@@ -249,7 +251,7 @@ if __name__ == "__main__":
                 length_queue=5, 
                 hz_threshold=25, 
                 threshold_increment=1.3,
-                plot=False,
+                plot=True,
                 padding_start_ms=5,    # 5ms prima
                 padding_end_ms=25,      # 25ms dopo
                 freq_min=200,
@@ -260,6 +262,18 @@ if __name__ == "__main__":
             # Stampa informazioni sul whoop
             if whoop_info is not None:
                 pitch_detector.print_whoop_info()
+
+                # to get the absolute start and end samples in the original audio we need outer segment start (present in the name),
+                # the inner segment start (present in peak_windows_) and finally the whoop_info start_sample_padded and end_sample_padded
+
+                m = re.search(r"_([0-9]+\.[0-9]+)-[0-9]+\.[0-9]+s\.wav$", file)
+                if m:
+                    outer_offset = float(m.group(1))   # 3.505
+
+                inner_offset = detector.peak_windows_[segment_idx][0]  # in secondi
+                absolute_start_time = inner_offset + outer_offset + whoop_info['start_sample_padded']/sr
+                absolute_end_time = inner_offset + outer_offset + whoop_info['end_sample_padded']/sr
+                print(f"Whoop absolute window: {absolute_start_time:.3f}s - {absolute_end_time:.3f}s")
 
 
                 # esegui analisi armonica
@@ -285,8 +299,8 @@ if __name__ == "__main__":
 
                     f0_frequencies_final.append(f0)
                     duration_ms_final.append(whoop_info['duration_padded_ms'])
-        else:
-            print("Nessun whoop rilevato in questo file.")
+            else:
+                print("Nessun whoop rilevato in questo file.")
 
     print("\n\nAnalisi completata per tutti i file.")
     print("="*80)

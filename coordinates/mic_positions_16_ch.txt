@@ -1,0 +1,18 @@
+# coordinates of only the first 16 channels (in meters, origin at the bottom-left corner of the plexiglass)
+0.0, 0.205, 0.0, 0.32 # Boundaries: (x_min, x_max, y_min, y_max)
+0.054, 0.253, # Ch 1 (A)
+0.054, 0.202, # Ch 2 BROKEN
+0.055, 0.149, # Ch 3 BROKEN
+0.055, 0.098, # Ch 4 (B)
+0.101, 0.069, # Ch 5 (C)
+0.100, 0.122, # Ch 6 (D)
+0.099, 0.174, # Ch 7 (E)
+0.098, 0.227, # Ch 8 BROKEN
+0.142, 0.253, # Ch 9 (F)
+0.142, 0.201, # Ch 10 (G)
+0.142, 0.148, # Ch 11 (H)
+0.142, 0.097, # Ch 12 (I)
+0.187, 0.070, # Ch 13 BROKEN
+0.187, 0.121, # Ch 14 (J)
+0.187, 0.173, # Ch 15 (K)
+0.188, 0.225, # Ch 16 (L)

@@ -369,7 +369,7 @@ def main():
 
     reference_whoop_folder = "sounds/best_whoop_available/"
     reference_whoop_path = "audio_recording_2025-09-15T06_40_43.498109Z_ch04_5.005s_3.505-6.505s.wav"
-    raw_audio_folder = "D:/soundofbees/"
+    raw_audio_folder = "E:/soundofbees/"
     channel_broken = [2, 3, 8, 13, 21, 25, 27, 28, 31]
     channel_broken = [x - 1 for x in channel_broken]  # zero-based index
 
@@ -443,9 +443,9 @@ def main():
 #     channel_broken = [2, 3, 8, 13, 21, 25, 27, 28, 31]
 #     channel_broken = [x - 1 for x in channel_broken]  # zero-based index
 
-#     raw_folder = "D:/soundofbees/"
+#     raw_folder = "sounds/tmp/"
 #     whoops_folder = "sounds/best_whoop_available"
-#     starting_whoop = "audio_recording_2025-09-15T06_22_43.635117Z_ch06_52.855s_51.355-54.395s.wav"
+#     starting_whoop = "audio_recording_2025-09-15T06_40_43.498109Z_ch04_5.005s_3.505-6.505s.wav"
 
 #     # Trova tutti i file .wav nella cartella
 #     whoops = sorted([f for f in os.listdir(whoops_folder) if f.endswith('.wav')])

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Tuple, List, Dict, Optional
 import warnings
 import matplotlib.pyplot as plt
+from pitch_detector import PitchDetector
 
 
 # ============================================================================
@@ -23,18 +24,29 @@ class MicrophoneArray:
     """Rappresenta un array di microfoni con posizioni 2D."""
     positions: np.ndarray
     sample_rate: int
-    channel_broken: List[int] | None = None
+    validated_channels: List[int] | None = None
+    boundaries: Tuple[float, float, float, float] | None = None  # (x_min, x_max, y_min, y_max)
+    margin: float = 0.05 # margine extra per la griglia di ricerca
 
     def __post_init__(self):
-        if self.channel_broken is None:
-            self.channel_broken = []
+        if self.validated_channels is None:
+            self.validated_channels = []
         else:
-            self.channel_broken = list(self.channel_broken)
+            self.validated_channels = list(self.validated_channels)
 
     @property
     def n_mics(self) -> int:
         """Numero di microfoni."""
         return self.positions.shape[0]
+    
+    def add_margin(self) -> None:
+        """Aggiunge margine alle boundaries."""
+        if self.boundaries is not None:
+            x_min, x_max, y_min, y_max = self.boundaries
+            self.boundaries = (x_min - self.margin, x_max + self.margin,
+                               y_min - self.margin, y_max + self.margin)
+        else:
+            warnings.warn("Boundaries non definite; impossibile aggiungere margine.")
 
     def get_mic_pair(self, i: int, j: int) -> Tuple[np.ndarray, np.ndarray]:
         """Restituisce le posizioni di due microfoni."""
@@ -43,17 +55,33 @@ class MicrophoneArray:
     def get_all_pairs(self) -> List[Tuple[int, int]]:
         """
         Restituisce gli indici di tutte le coppie di microfoni
-        escludendo i canali rotti.
+        che coinvolgono SOLO i canali validati.
+        
+        Se validated_channels = [0, 1, 3, 5], restituisce tutte le coppie
+        composte esclusivamente da questi canali:
+        [(0, 1), (0, 3), (0, 5), (1, 3), (1, 5), (3, 5)]
+        
+        I canali NON nella lista validated_channels vengono completamente ignorati.
+        
+        Returns:
+            Lista di tuple (i, j) dove i < j e ENTRAMBI i e j sono in validated_channels
         """
-        broken = set(self.channel_broken or [])
+        # Se non ci sono canali validati, restituisci lista vuota
+        if not self.validated_channels:
+            return []
+        
+        # Converti in set per ricerca O(1)
+        valid_set = set(self.validated_channels)
+        
         pairs: List[Tuple[int, int]] = []
-        for i in range(self.n_mics):
-            if i in broken:
-                continue
-            for j in range(i + 1, self.n_mics):
-                if j in broken:
-                    continue
-                pairs.append((i, j))
+        
+        # Itera su tutti i canali validati
+        for i in self.validated_channels:
+            # Per ogni canale validato, cercane altri con indice più alto
+            for j in self.validated_channels:
+                if i < j:
+                    pairs.append((i, j))
+        
         return pairs
 
     def get_pairs_from_reference_channel(self, reference_channel: int) -> List[Tuple[int, int]]:
@@ -243,6 +271,10 @@ class GCCPHATCorrelator:
                 return 0.0
         
         frac = lag_samples - lag_floor
+
+        
+
+
         return ((1 - frac) * correlation[lag_floor] + 
                 frac * correlation[lag_ceil])
 
@@ -271,15 +303,18 @@ class SRPLocalizator:
         self.reference_channel = reference_channel
         
         self._pairwise_correlations = {}
+        self._pitches = []
+
+        # add margin to mic_array boundaries if defined
+        if self.mic_array.boundaries is not None:
+            self.mic_array.add_margin()
+
     
-    def create_search_grid_full(self, margin: float = 0.2, 
-                               resolution: float = 0.02) -> SearchGrid:
+    def create_search_grid_full(self, resolution: float = 0.02) -> SearchGrid:
         """Crea una search grid che copre l'intero array di microfoni più margine."""
-        x_min, x_max = self.mic_array.positions[:, 0].min(), self.mic_array.positions[:, 0].max()
-        y_min, y_max = self.mic_array.positions[:, 1].min(), self.mic_array.positions[:, 1].max()
         
-        x_range = (x_min - margin, x_max + margin)
-        y_range = (y_min - margin, y_max + margin)
+        x_range = (self.mic_array.boundaries[0], self.mic_array.boundaries[1]) # x_min to x_max
+        y_range = (self.mic_array.boundaries[2], self.mic_array.boundaries[3]) # y_min to y_max
         
         return SearchGrid(x_range=x_range, y_range=y_range, resolution=resolution)
     
@@ -304,27 +339,15 @@ class SRPLocalizator:
         
         x_range = (ref_x - x_width / 2, ref_x + x_width / 2)
         y_range = (ref_y - y_height / 2, ref_y + y_height / 2)
+
+        # crop within boundaries
+        x_range = (max(x_range[0], self.mic_array.boundaries[0]), 
+                   min(x_range[1], self.mic_array.boundaries[1]))
+        y_range = (max(y_range[0], self.mic_array.boundaries[2]), 
+                   min(y_range[1], self.mic_array.boundaries[3]))
         
         return SearchGrid(x_range=x_range, y_range=y_range, resolution=resolution)
     
-    def create_search_grid_around_channels(self, 
-                                          reference_channels: List[int],
-                                          margin: float = 0.1,
-                                          resolution: float = 0.02) -> SearchGrid:
-        """Crea una search grid attorno a una lista di canali di riferimento."""
-        for ch in reference_channels:
-            if ch < 0 or ch >= self.mic_array.n_mics:
-                raise ValueError(f"Canale {ch} non valido")
-        
-        ref_positions = self.mic_array.positions[reference_channels]
-        
-        x_min, x_max = ref_positions[:, 0].min(), ref_positions[:, 0].max()
-        y_min, y_max = ref_positions[:, 1].min(), ref_positions[:, 1].max()
-        
-        x_range = (x_min - margin, x_max + margin)
-        y_range = (y_min - margin, y_max + margin)
-        
-        return SearchGrid(x_range=x_range, y_range=y_range, resolution=resolution)
     
     def precompute_correlations(self, signals: np.ndarray, max_tau_ms: float = 100):
         """
@@ -359,7 +382,7 @@ class SRPLocalizator:
         dist_i = np.linalg.norm(point - mic_i)
         dist_j = np.linalg.norm(point - mic_j)
         
-        distance_diff = dist_j - dist_i
+        distance_diff = -(dist_j - dist_i)
         tdoa_sec = distance_diff / self.c
         
         return tdoa_sec
@@ -392,6 +415,17 @@ class SRPLocalizator:
 
             if -max_samples <= tdoa_samples <= max_samples:
                 idx = tdoa_samples + max_samples
+                # plot correlation con linea verticale in corrispondenza di lag_samples
+                # plt.figure(figsize=(6, 3))
+                # plt.plot(correlation, label='Correlation')
+                # plt.axvline(x=idx, color='red', linestyle='--', label='Requested Lag')
+                # plt.xlabel("Lag Samples")
+                # plt.ylabel("Correlation Value")
+                # plt.legend()
+                # plt.grid()
+                # plt.show()
+
+
                 coherence = self.correlator.get_correlation_value(correlation, idx)
             else:
                 coherence = np.nan  # fuori range
@@ -478,7 +512,8 @@ def plot_power_map_2d(result: LocalizationResult,
                       search_grid: SearchGrid,
                       figsize: Tuple[int, int] = (12, 8),
                       cmap: str = 'viridis',
-                      show_colorbar: bool = True) -> None:
+                      show_colorbar: bool = True, 
+                      ground_truth: Tuple[float, float] = None) -> None:
     """
     Visualizza la power map 2D con i microfoni sovrapposti.
     
@@ -517,13 +552,10 @@ def plot_power_map_2d(result: LocalizationResult,
     # Plotta i microfoni come pallini rossi
     mic_positions = mic_array.positions
     for mic_pos in mic_positions:
-        if mic_pos[0] == 0.0 and mic_pos[1] == 0.0:
-            continue  # Salta microfoni rotti (posizione 0,0)
-        else:
-            ax.scatter(mic_pos[0], mic_pos[1], 
-               color='red', s=100, marker='o', edgecolors='darkred', 
-               linewidths=2, label='Microphones', zorder=5)
-    
+        ax.scatter(mic_pos[0], mic_pos[1], 
+            color='red', s=100, marker='o', edgecolors='darkred', 
+            linewidths=2, label='Microphones', zorder=5)
+
     # Annotazioni dei numeri dei canali (1-based per user-friendliness)
     for idx, pos in enumerate(mic_positions):
         if pos[0] == 0.0 and pos[1] == 0.0:
@@ -539,6 +571,12 @@ def plot_power_map_2d(result: LocalizationResult,
                color='yellow', s=300, marker='*', edgecolors='gold', 
                linewidths=2, label='Estimated Position', zorder=6)
     
+    # Plotta ground truth se disponibile
+    if ground_truth is not None:
+        ax.scatter(ground_truth[0], ground_truth[1],
+                   color='cyan', s=200, marker='X', edgecolors='deepskyblue',
+                   linewidths=2, label='Ground Truth', zorder=6)
+        
     # Aggiunge la barra di colori
     if show_colorbar:
         cbar = plt.colorbar(contour, ax=ax, label='SRP Power')
