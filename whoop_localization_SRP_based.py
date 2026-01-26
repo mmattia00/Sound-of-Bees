@@ -1,11 +1,11 @@
-from whoop_localizator import SRPLocalizator, MicrophoneArray, SearchGrid, plot_power_map_2d
+from classes.whoop_localizator import SRPLocalizator, MicrophoneArray, SearchGrid, plot_power_map_2d
 import numpy as np
 import re
 import soundfile as sf
 import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
-from pitch_detector import PitchDetector
-from whoop_detector import WhoopDetector
+from classes.pitch_detector import PitchDetector
+from classes.whoop_detector import WhoopDetector
 
 def parse_filename(filename):
     """

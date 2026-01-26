@@ -462,13 +462,16 @@ class WhoopDetector:
         output_folder = os.path.join(output_dir, base_filename)
         os.makedirs(output_folder, exist_ok=True)
 
-        for i in range(len(self.peak_windows_)):
-            start_time, end_time = self.peak_windows_[i]
-            peak_time = self.peak_times_[i]
+        peaks_info = self.get_peak_info()
+
+        for i in range(len(peaks_info)):
+            start_time, end_time = peaks_info[i]['window_start'], peaks_info[i]['window_end']
+            peak_time = peaks_info[i]['peak_time']
             segment = self.signal[int(start_time * self.sr):int(end_time * self.sr)]
 
-            # Crea il nome del file: ch{channel}_{peak_time}s_{start}-{end}s.wav
-            filename = f"ch{channel:02d}_{peak_time:.3f}s_{start_time:.3f}-{end_time:.3f}s.wav"
+            # Crea il nome del file: ch_{channel}_peaktime_{peak_time}_windowstart_{start}_windowend_{end}_hnrvalue_{hnr}.wav
+            hnr_value = peaks_info[i]['peak_hnr_value']
+            filename = f"ch_{channel:02d}_peaktime_{peak_time:.3f}_windowstart_{start_time:.3f}_windowend_{end_time:.3f}_hnrvalue_{hnr_value:.2f}.wav"
             output_path = os.path.join(output_folder, filename)
 
             # Salva il file WAV
@@ -584,7 +587,8 @@ class WhoopDetector:
                 'peak_time': float(peak_time),
                 'window_start': float(window[0]),
                 'window_end': float(window[1]),
-                'window_duration': float(window[1] - window[0])
+                'window_duration': float(window[1] - window[0]),
+                'peak_hnr_value': float(self.results_['hnr_smoothed'][peak_idx])
             }
             peak_info.append(info)
         

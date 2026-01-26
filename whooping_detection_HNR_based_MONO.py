@@ -1,4 +1,4 @@
-from whoop_detector import WhoopDetector
+from classes.whoop_detector import WhoopDetector
 import soundfile as sf
 import sounddevice as sd
 

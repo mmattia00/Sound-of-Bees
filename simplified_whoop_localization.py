@@ -1,8 +1,8 @@
 import numpy as np
 import soundfile as sf
 import sounddevice as sd
-from whoop_detector import WhoopDetector
-from whoop_localizator import MicrophoneArray, SRPLocalizator, plot_power_map_2d
+from classes.whoop_detector import WhoopDetector
+from classes.whoop_localizator import MicrophoneArray, SRPLocalizator, plot_power_map_2d
 import matplotlib.pyplot as plt
 import os
 

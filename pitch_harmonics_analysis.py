@@ -1,7 +1,7 @@
 import re
-from whoop_detector import WhoopDetector
-from harmonics_analyzer import HarmonicsAnalyzer
-from pitch_detector import PitchDetector
+from classes.whoop_detector import WhoopDetector
+from classes.harmonics_analyzer import HarmonicsAnalyzer
+from classes.pitch_detector import PitchDetector
 import os
 import librosa
 import numpy as np

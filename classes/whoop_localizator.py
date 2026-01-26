@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Tuple, List, Dict, Optional
 import warnings
 import matplotlib.pyplot as plt
-from pitch_detector import PitchDetector
+from classes.pitch_detector import PitchDetector
 
 
 # ============================================================================

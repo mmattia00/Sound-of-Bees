@@ -1,15 +1,17 @@
 import soundfile as sf
 import sounddevice as sd
-from whoop_detector import WhoopDetector
+from classes.whoop_detector import WhoopDetector
 import os
 
 
 
 if __name__ == "__main__":
     # Cartella contenente i file audio
-    raw_audio_folder = "D:\soundofbees"
-    candidates_folder = "sounds\whoop_candidates"
-    starting_audiofile_name = "audio_recording_2025-09-15T19_22_49.036144Z.wav" # l'ultimo file processato di quelli presenti nel hard disk in locale
+    raw_audio_folder = "E:\soundofbees"
+    candidates_folder = "sounds\whoop_candidates_splitted" # nuova struttura di cartelle dove ogni .wav è più breve e centralizzato attorno al picco e hopefully contiene esattamente solo un whoop
+    # starting_audiofile_name = "audio_recording_2025-09-15T00_00_43.625108Z.wav" # il primo file di quelli presenti nel hard disk in locale
+    starting_audiofile_name = "audio_recording_2025-09-16T01_35_48.799810Z.wav" # ultimo file analizzato prima di interrompere la precedente esecuzione
+    # starting_audiofile_name = "audio_recording_2025-09-15T07_09_45.544480Z.wav" # file significativo per test
 
     
     # Canali rotti
@@ -87,9 +89,9 @@ if __name__ == "__main__":
 
                 # Esegui la rilevazione
                 detection_results = detector.detect(
-                    percentile=99.5,
+                    percentile=95,
                     offset=4,
-                    window_sec=3, # lunghezza finestra di analisi intorno al picco
+                    window_sec=0.5, # lunghezza finestra di analisi intorno al picco
                     merge_overlaps=True
                 )
 
@@ -101,9 +103,9 @@ if __name__ == "__main__":
                 peak_info = detector.get_peak_info()
                 for info in peak_info:
                     print(f"Picco {info['index']}: t={info['peak_time']:.3f}s, "
-                        f"finestra=[{info['window_start']:.3f}, {info['window_end']:.3f}]s")
+                        f"finestra=[{info['window_start']:.3f}, {info['window_end']:.3f}]s, "
+                        f"HNR={info['peak_hnr_value']:.2f} dB")
                     
-                
 
                 # Accesso diretto agli array
                 # detector.peaks_         -> indici dei picchi nell'array HNR

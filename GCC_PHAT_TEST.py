@@ -364,158 +364,158 @@ def make_delayed_copy(raw_audio, sr, reference_ch, start_time, end_time, delay_m
 
 
 
-# main per testare gcc-phat tra due whoop estratti da canali vicini oppure tra whoop di riferimento e una sua copia ritardata
-def main():
-
-    reference_whoop_folder = "sounds/best_whoop_available/"
-    reference_whoop_path = "audio_recording_2025-09-15T06_40_43.498109Z_ch04_5.005s_3.505-6.505s.wav"
-    raw_audio_folder = "E:/soundofbees/"
-    channel_broken = [2, 3, 8, 13, 21, 25, 27, 28, 31]
-    channel_broken = [x - 1 for x in channel_broken]  # zero-based index
-
-    reference_whoop_info = parse_filename(reference_whoop_path)
-
-    
-    # load reference whoop file -----------------------------------------------------------------------------
-    reference_whoop, sr = sf.read(reference_whoop_folder + reference_whoop_path, dtype='float32')
-    reference_ch = reference_whoop_info['channel'] - 1  # zero-based index
-
-    # load neighboring whoop file -----------------------------------------------------------------------------
-    raw_audio, sr = sf.read(raw_audio_folder + reference_whoop_info['raw_path'] + ".wav", dtype='float32')
-    
-    # Calcola la finestra temporale PRIMA
-    start_sample = time_to_samples(reference_whoop_info['start_time'], sr)
-    end_sample = time_to_samples(reference_whoop_info['end_time'], sr)
-    
-    
-    # # Trova neighbor channel
-    # neighbor_ch = reference_ch + 3
-    # while neighbor_ch < raw_audio.shape[1] and neighbor_ch in channel_broken:
-    #     neighbor_ch += 1
-    # print(f"Reference ch: {reference_ch}, Neighbor ch: {neighbor_ch}")
-    
-    # ESTRAI CORRETTAMENTE: prima tempo, poi canale
-    # neighboring_whoop = raw_audio[start_sample:end_sample, neighbor_ch]  # (samples, 1) → mono!
-
-    true_delay_ms = -3.5  # delay in milliseconds
-    neighboring_whoop = make_delayed_copy(raw_audio, sr, reference_ch, reference_whoop_info['start_time'], reference_whoop_info['end_time'], true_delay_ms)
-
-    # play for test
-    # Normalizza per evitare clipping
-    max_val = np.max(np.abs(reference_whoop))
-    if max_val > 0:
-        reference_whoop = reference_whoop / (max_val * 1.1)
-    sd.play(reference_whoop, sr)
-    sd.wait()
-    # Normalizza per evitare clipping
-    max_val = np.max(np.abs(neighboring_whoop))
-    if max_val > 0:
-        neighboring_whoop = neighboring_whoop / (max_val * 1.1)
-    sd.play(neighboring_whoop, sr)
-    sd.wait()
-
-    # ========== APPLICA GCC-PHAT ==========
-    print(f"\n{'='*60}")
-    print(f"GCC-PHAT TIME DELAY ESTIMATION")
-    print(f"{'='*60}")
-    
-    result = gcc_phat(reference_whoop, neighboring_whoop, sr, max_tau_ms=50)
-    
-    print(f"Delay (samples): {result['delay_samples']}")
-    print(f"Delay (ms):      {result['delay_ms']:.3f}")
-    print(f"Delay (sec):     {result['delay_sec']:.6f}")
-    print(f"Peak correlation: {result['peak_value']:.6f}")
-    print(f"{'='*60}\n")
-
-    print(f"True delay:      {true_delay_ms:.3f} ms")
-
-
-
-# # main che dato il canale di riferimento estrare la stessa finestra temporale da tutti i canali e li riproduce uno alla volta
+# # main per testare gcc-phat tra due whoop estratti da canali vicini oppure tra whoop di riferimento e una sua copia ritardata
 # def main():
 
-#     num_channels_default = 16
-#     pause_between_default = 0.5
-
-    
-
-#     # Canali rotti
+#     reference_whoop_folder = "sounds/best_whoop_available/"
+#     reference_whoop_path = "audio_recording_2025-09-15T06_40_43.498109Z_ch04_5.005s_3.505-6.505s.wav"
+#     raw_audio_folder = "E:/soundofbees/"
 #     channel_broken = [2, 3, 8, 13, 21, 25, 27, 28, 31]
 #     channel_broken = [x - 1 for x in channel_broken]  # zero-based index
 
-#     raw_folder = "sounds/tmp/"
-#     whoops_folder = "sounds/best_whoop_available"
-#     starting_whoop = "audio_recording_2025-09-15T06_40_43.498109Z_ch04_5.005s_3.505-6.505s.wav"
+#     reference_whoop_info = parse_filename(reference_whoop_path)
 
-#     # Trova tutti i file .wav nella cartella
-#     whoops = sorted([f for f in os.listdir(whoops_folder) if f.endswith('.wav')])
     
-#     # Trova l’indice dell audio file di partenza
-#     try:
-#         start_index = whoops.index(starting_whoop)
-#     except ValueError:
-#         start_index = -1
+#     # load reference whoop file -----------------------------------------------------------------------------
+#     reference_whoop, sr = sf.read(reference_whoop_folder + reference_whoop_path, dtype='float32')
+#     reference_ch = reference_whoop_info['channel'] - 1  # zero-based index
 
-#     # Prendi tutti i file successivi
-#     if start_index != -1:
-#         whoops = whoops[start_index:]
+#     # load neighboring whoop file -----------------------------------------------------------------------------
+#     raw_audio, sr = sf.read(raw_audio_folder + reference_whoop_info['raw_path'] + ".wav", dtype='float32')
+    
+#     # Calcola la finestra temporale PRIMA
+#     start_sample = time_to_samples(reference_whoop_info['start_time'], sr)
+#     end_sample = time_to_samples(reference_whoop_info['end_time'], sr)
+    
+    
+#     # # Trova neighbor channel
+#     # neighbor_ch = reference_ch + 3
+#     # while neighbor_ch < raw_audio.shape[1] and neighbor_ch in channel_broken:
+#     #     neighbor_ch += 1
+#     # print(f"Reference ch: {reference_ch}, Neighbor ch: {neighbor_ch}")
+    
+#     # ESTRAI CORRETTAMENTE: prima tempo, poi canale
+#     # neighboring_whoop = raw_audio[start_sample:end_sample, neighbor_ch]  # (samples, 1) → mono!
+
+#     true_delay_ms = -3.5  # delay in milliseconds
+#     neighboring_whoop = make_delayed_copy(raw_audio, sr, reference_ch, reference_whoop_info['start_time'], reference_whoop_info['end_time'], true_delay_ms)
+
+#     # play for test
+#     # Normalizza per evitare clipping
+#     max_val = np.max(np.abs(reference_whoop))
+#     if max_val > 0:
+#         reference_whoop = reference_whoop / (max_val * 1.1)
+#     sd.play(reference_whoop, sr)
+#     sd.wait()
+#     # Normalizza per evitare clipping
+#     max_val = np.max(np.abs(neighboring_whoop))
+#     if max_val > 0:
+#         neighboring_whoop = neighboring_whoop / (max_val * 1.1)
+#     sd.play(neighboring_whoop, sr)
+#     sd.wait()
+
+#     # ========== APPLICA GCC-PHAT ==========
+#     print(f"\n{'='*60}")
+#     print(f"GCC-PHAT TIME DELAY ESTIMATION")
+#     print(f"{'='*60}")
+    
+#     result = gcc_phat(reference_whoop, neighboring_whoop, sr, max_tau_ms=50)
+    
+#     print(f"Delay (samples): {result['delay_samples']}")
+#     print(f"Delay (ms):      {result['delay_ms']:.3f}")
+#     print(f"Delay (sec):     {result['delay_sec']:.6f}")
+#     print(f"Peak correlation: {result['peak_value']:.6f}")
+#     print(f"{'='*60}\n")
+
+#     print(f"True delay:      {true_delay_ms:.3f} ms")
+
+
+
+# main che dato il canale di riferimento estrare la stessa finestra temporale da tutti i canali e li riproduce uno alla volta
+def main():
+
+    num_channels_default = 16
+    pause_between_default = 0.5
+
+    
+
+    # Canali rotti
+    channel_broken = [2, 3, 8, 13, 21, 25, 27, 28, 31]
+    channel_broken = [x - 1 for x in channel_broken]  # zero-based index
+
+    raw_folder = "sounds/tmp/"
+    whoops_folder = "sounds/best_whoop_available"
+    starting_whoop = "audio_recording_2025-09-15T06_40_43.498109Z_ch04_5.005s_3.505-6.505s.wav"
+
+    # Trova tutti i file .wav nella cartella
+    whoops = sorted([f for f in os.listdir(whoops_folder) if f.endswith('.wav')])
+    
+    # Trova l’indice dell audio file di partenza
+    try:
+        start_index = whoops.index(starting_whoop)
+    except ValueError:
+        start_index = -1
+
+    # Prendi tutti i file successivi
+    if start_index != -1:
+        whoops = whoops[start_index:]
     
 
 
-#     if not whoops:
-#         print("Nessun file .wav trovato in " + whoops_folder)
-#         exit(1)
+    if not whoops:
+        print("Nessun file .wav trovato in " + whoops_folder)
+        exit(1)
     
-#     print("Trovati " + str(len(whoops)) + " file audio")
-#     print("="*80 + "\n")
+    print("Trovati " + str(len(whoops)) + " file audio")
+    print("="*80 + "\n")
     
-#     # Processa ogni file
-#     for file_idx, whoop_filename in enumerate(whoops, 1):
+    # Processa ogni file
+    for file_idx, whoop_filename in enumerate(whoops, 1):
 
-#         channel = whoop_filename.split("_")[5]
-#         channel_num = int(channel.split("ch")[1])
+        channel = whoop_filename.split("_")[5]
+        channel_num = int(channel.split("ch")[1])
 
-#         if channel_num > 16:
-#             continue
-#         else:
-#             print(whoop_filename)
-#             print(f"Expected whoop at channel {channel_num}") 
+        if channel_num > 16:
+            continue
+        else:
+            print(whoop_filename)
+            print(f"Expected whoop at channel {channel_num}") 
 
-#             # print(whoop_filename.split("_ch"))  # -> ['audio_recording_2025-09-15T06_00_43.664505Z', '06_24.035s_22.535-25.535s.wav']
-#             # Splitta sul pattern "_ch" e prendi la parte prima
-#             rawfilepath = f"{raw_folder}{whoop_filename.split('_ch')[0]}.wav"
+            # print(whoop_filename.split("_ch"))  # -> ['audio_recording_2025-09-15T06_00_43.664505Z', '06_24.035s_22.535-25.535s.wav']
+            # Splitta sul pattern "_ch" e prendi la parte prima
+            rawfilepath = f"{raw_folder}{whoop_filename.split('_ch')[0]}.wav"
 
 
 
-#             try:
-#                 # Carica il file audio raw
-#                 signal_multichannel, sr = sf.read(rawfilepath)
+            try:
+                # Carica il file audio raw
+                signal_multichannel, sr = sf.read(rawfilepath)
 
                 
                 
-#             except Exception as e:
-#                 print("Errore nel caricamento di " + rawfilepath + ": " + str(e))
+            except Exception as e:
+                print("Errore nel caricamento di " + rawfilepath + ": " + str(e))
             
             
-#             # Parsa il filename per estrarre start/end
-#             print(f"\n{'='*60}")
-#             print(f"PARSING FILENAME")
-#             print(f"{'='*60}")
-#             time_info = parse_filename(whoop_filename)
+            # Parsa il filename per estrarre start/end
+            print(f"\n{'='*60}")
+            print(f"PARSING FILENAME")
+            print(f"{'='*60}")
+            time_info = parse_filename(whoop_filename)
             
             
-#             # Estrai e riproduci i canali
-#             extract_and_play_channels(
-#                 signal_multichannel, 
-#                 sr, 
-#                 time_info['start_time'],
-#                 time_info['end_time'],
-#                 num_channels=num_channels_default,
-#                 pause_between=pause_between_default,
-#                 channel_broken=channel_broken
-#             )
+            # Estrai e riproduci i canali
+            extract_and_play_channels(
+                signal_multichannel, 
+                sr, 
+                time_info['start_time'],
+                time_info['end_time'],
+                num_channels=num_channels_default,
+                pause_between=pause_between_default,
+                channel_broken=channel_broken
+            )
 
-#             input("vai avanti?")
+            input("vai avanti?")
 
 
 
