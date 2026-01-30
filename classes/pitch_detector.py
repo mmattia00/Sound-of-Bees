@@ -59,32 +59,32 @@ class PitchDetector:
 
         return fundamental_frequencies
     
-    def _plot_results(self, freq_array, best_queue, all_queues, f0):
+    def _plot_results(self, freq_array, best_queue_indices, all_queues, f0):
         plt.figure(figsize=(12, 6))
         
         if self.hop_length is not None and self.sr is not None:
             x_axis = np.arange(len(freq_array)) * self.hop_length / self.sr
-            x_label = 'Tempo (s)'
+            x_label = 'Time (s)'
             title_suffix = f' - Hop: {self.hop_length/self.sr*1000:.1f}ms'
         else:
             x_axis = np.arange(len(freq_array))
-            x_label = 'Indice del frame'
+            x_label = 'Frame Index'
             title_suffix = ''
         
         plt.plot(x_axis, freq_array, 'o-', color='lightgray', 
-                linewidth=1, markersize=6, alpha=0.6, label='Array originale')
+                linewidth=1, markersize=6, alpha=0.6, label='Original array')
         
         if all_queues:
             for i, queue in enumerate(all_queues):
-                if queue != best_queue:
+                if queue != best_queue_indices:
                     plt.plot(x_axis[queue], freq_array[queue], 'o-', 
                             color='orange', alpha=0.3, linewidth=1, 
-                            markersize=4, label='Code candidate' if i == 0 else '')
+                            markersize=4, label='Candidate queues' if i == 0 else '')
         
-        if best_queue is not None and len(best_queue) > 0:
-            plt.plot(x_axis[best_queue], freq_array[best_queue], 'o-', 
+        if best_queue_indices is not None and len(best_queue_indices) > 0:
+            plt.plot(x_axis[best_queue_indices], freq_array[best_queue_indices], 'o-', 
                     color='red', linewidth=2.5, markersize=8, 
-                    label=f'Best queue (n={len(best_queue)})', zorder=5)
+                    label=f'Best queue (n={len(best_queue_indices)})', zorder=5)
             
             if f0 is not None:
                 plt.axhline(y=f0, color='red', linestyle='--', 
@@ -92,36 +92,35 @@ class PitchDetector:
                         label=f'f0 = {f0:.2f} Hz')
                 
             if self.hop_length is not None and self.sr is not None:
-                start_time = x_axis[best_queue[0]]
-                end_time = x_axis[best_queue[-1]]
+                start_time = x_axis[best_queue_indices[0]]
+                end_time = x_axis[best_queue_indices[-1]]
                 plt.axvspan(start_time, end_time, alpha=0.2, color='red', label='Whoop region')
         else:
-            plt.text(0.5, 0.5, 'Nessuna coda valida trovata', 
+            plt.text(0.5, 0.5, 'No valid queue found', 
                     transform=plt.gca().transAxes, 
                     fontsize=14, color='red', ha='center', va='center')
         
         plt.xlabel(x_label, fontsize=12)
-        plt.ylabel('Frequenza (Hz)', fontsize=12)
-        plt.title(f'Analisi f0: Array originale e Best Queue identificata{title_suffix}', 
+        plt.ylabel('Frequency (Hz)', fontsize=12)
+        plt.title(f'f0 Analysis{title_suffix}', 
                 fontsize=14, fontweight='bold')
         plt.grid(True, alpha=0.3, linestyle='--')
         plt.legend(loc='best', fontsize=10)
         plt.tight_layout()
         plt.show()
 
+
     def estimate_f0(self, length_queue=5, hz_threshold=10, threshold_increment=1.5, 
-                    plot=False, padding_start_ms=20, padding_end_ms=20, 
-                    freq_min=200, freq_max=600):
-        
+                padding_start_ms=20, padding_end_ms=20, 
+                freq_min=200, freq_max=600):
+    
         freq_array = np.asarray(self.compute_fundamental_frequencies(freq_min=freq_min, freq_max=freq_max))
         
         valid_mask = np.isfinite(freq_array) & (freq_array > 0)
         valid_indices = np.where(valid_mask)[0]
         
         if len(valid_indices) < 2:
-            if plot:
-                self._plot_results(freq_array, None, [], None)
-            return None, [], [], None
+            return None, {'frame_indices': [], 'samples': [], 'f0_values': []}, [], [], None
         
         all_queues = []
         
@@ -154,21 +153,27 @@ class PitchDetector:
                 all_queues.append(current_queue)
         
         if not all_queues:
-            if plot:
-                self._plot_results(freq_array, None, [], None)
-            return None, [], [], None
+            return None, {'frame_indices': [], 'samples': [], 'f0_values': []}, [], [], None
         
-        best_queue = max(all_queues, key=len)
-        f0 = np.median(freq_array[best_queue])
+        best_queue_indices = max(all_queues, key=len)
+        f0 = np.median(freq_array[best_queue_indices])
 
-        freq_values_in_queue = freq_array[best_queue]
+        freq_values_in_queue = freq_array[best_queue_indices]
         differences = np.abs(freq_values_in_queue - f0)
         median_position_in_queue = np.argmin(differences)
-        f0_median_frame_idx = best_queue[median_position_in_queue]
+        f0_median_frame_idx = best_queue_indices[median_position_in_queue]
+        
+        # ============= NUOVO: Crea il dizionario best_queue con 3 liste =============
+        best_queue = {
+            'frame_indices': best_queue_indices,
+            'samples': [frame_idx * self.hop_length for frame_idx in best_queue_indices],
+            'f0_values': freq_array[best_queue_indices].tolist()
+        }
+        # =========================================================================
         
         if self.hop_length is not None and self.sr is not None:
-            start_frame_idx = best_queue[0]
-            end_frame_idx = best_queue[-1]
+            start_frame_idx = best_queue_indices[0]
+            end_frame_idx = best_queue_indices[-1]
             
             start_sample = start_frame_idx * self.hop_length
             end_sample = end_frame_idx * self.hop_length
@@ -198,14 +203,18 @@ class PitchDetector:
                 'duration_padded_ms': duration_padded_ms,
                 'f0_median_frame_idx': f0_median_frame_idx,
                 'f0_median_sample': f0_median_sample_in_segment,
-                'frame_indices': best_queue,
-                'num_frames': len(best_queue)
+                'frame_indices': best_queue_indices,
+                'num_frames': len(best_queue_indices)
             }
+
+        # Calcola F0 mediana per ogni queue
+        all_queues_f0 = []
+        for queue in all_queues:
+            f0_queue = np.median(freq_array[queue])
+            all_queues_f0.append(f0_queue)
         
-        if plot:
-            self._plot_results(freq_array, best_queue, all_queues, f0)
-        
-        return f0, best_queue, all_queues, self.whoop_info
+        return f0, best_queue, all_queues, all_queues_f0, self.whoop_info
+
     
     def print_whoop_info(self):
         """

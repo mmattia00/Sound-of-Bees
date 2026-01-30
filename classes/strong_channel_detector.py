@@ -18,6 +18,8 @@ import matplotlib.colors as mcolors
 import matplotlib.cm as cm
 from shapely.geometry import Polygon as ShapelyPolygon
 import sounddevice as sd
+from matplotlib.patches import Patch
+
 
 
 
@@ -93,13 +95,15 @@ class StrongChannelDetector:
         start_time_ref: float,
         end_time_ref: float,
         f0_ref: float,
+        f0_ref_median_frame_idx: Optional[int] = None,
         f0_offset: float = 30,
         broken_channels: Optional[List[int]] = None,
         num_channels: Optional[int] = None,
         detector_config: Optional[Dict] = None,
         pitch_config: Optional[Dict] = None,
-        verbose: bool = True,
-        plot: bool = True
+        verbose: bool = False,
+        plot: bool = False,
+        listening_test: bool = False
     ):
         """
         Inizializza il detector.
@@ -122,17 +126,19 @@ class StrongChannelDetector:
         self.start_time_ref = start_time_ref
         self.end_time_ref = end_time_ref
         self.f0_ref = f0_ref
+        self.f0_ref_median_frame_idx = f0_ref_median_frame_idx
         self.f0_offset = f0_offset
         self.broken_channels = set(broken_channels or [])
         self.num_channels = num_channels 
         self.verbose = verbose
         self.plot = plot
+        self.listening_test = listening_test
         
         # Conversione tempo → campioni per il segmento di riferimento
         self.start_sample = self._time_to_samples(self.start_time_ref)
         self.end_sample = self._time_to_samples(self.end_time_ref)
 
-        if self.channel_ref < 16:
+        if self.channel_ref - 1 < 16:
             self.channels_of_interest = list(range(16))
         else:
             self.channels_of_interest = list(range(16, 32))
@@ -203,8 +209,16 @@ class StrongChannelDetector:
         detector_window_sec: float = 0.5
     ) -> ChannelAnalysisResult:
         """
-        Analizza un singolo canale cercando l'evento all'interno
-        delle finestre definite da analyze_reference().
+        Analizza un singolo canale cercando l'evento all'interno della finestra.
+        
+        Logica:
+        1. HNR Detection: se no picco → return (canale non valido)
+        2. Pitch Detection: se no f0 → return (canale non valido)
+        3. Analisi code:
+        - Itera da quella più lunga
+        - Cerca coda con frame_idx di riferimento
+        - Se trovata: verifica f0 in range, altrimenti continua con prossima coda
+        4. Se nessuna coda valida: return (canale non valido)
         
         Args:
             channel_num: Indice del canale da analizzare
@@ -217,12 +231,11 @@ class StrongChannelDetector:
         """
         result = ChannelAnalysisResult(channel_num=channel_num, contains_whoop=False)
         
-        # Estrai il segmento del canale
+        # ========== STEP 1: HNR DETECTION ==========
         window_of_interest = self.signal_multichannel[
             self.start_sample:self.end_sample, channel_num
         ]
         
-        # Rilevamento picchi HNR
         detector = WhoopDetector(
             signal=window_of_interest,
             sr=self.sr,
@@ -237,6 +250,10 @@ class StrongChannelDetector:
         )
         
         peak_info = detector.get_peak_info()
+        hnr_values = detection_results['results']['hnr_smoothed']
+
+        if self.plot and self.listening_test:
+            self.play_channel(channel_num)
         
         if self.plot:
             detector.plot_analysis(ch_num=channel_num+1, figsize=(5, 2.5))
@@ -248,70 +265,121 @@ class StrongChannelDetector:
             )
             return result
         
-        # Ricerca di picchi entro la finestra temporale
-        hnr_values = detection_results['results']['hnr_smoothed']
-
-        # dato che siamo già in una finestra semplifichiamo la logica, non c'è bisogno di controllare che il picco sia in una finestra temporale
-        # analizza finestra, se c'è picco, analisi pitch, se f0 è nella finestra frequenziale allora il canale è valido
-        # analizza finestra, se non c'è nessun picco, canale non valido
-
-        if len(peak_info) > 0:
+        # ========== STEP 2: PITCH DETECTION ==========
+        pitch_detector = PitchDetector(
+            audio_segment=window_of_interest,
+            sr=self.sr
+        )
         
-            for peak_idx, peak in enumerate(peak_info):
+        f0_global, _, all_queues, all_queues_f0, whoop_pitch_info = pitch_detector.estimate_f0(
+            **self.pitch_config
+        )
+        
+        if f0_global is None:
+            self._log(
+                f"Canale {channel_num+1:2d}: F0 non stimato",
+                level="WARN"
+            )
+            if self.plot:
+                pitch_detector._plot_results(
+                    np.asarray(pitch_detector.compute_fundamental_frequencies(
+                        freq_min=self.pitch_config['freq_min'],
+                        freq_max=self.pitch_config['freq_max']
+                    )), None, all_queues, None
+                )
+            return result
+        
+        # ========== STEP 3: ANALISI DELLE CODE ==========
+        # Ordina le code per lunghezza (dalla più lunga)
+        queue_lengths = [len(q) for q in all_queues]
+        queue_indices_sorted = sorted(range(len(all_queues)), key=lambda i: queue_lengths[i], reverse=True)
+        
+        # # Stampa info code
+        # print(f"\n\n INFO CODE RILEVATE PER CANALE {channel_num+1}: \n\n")
+        # for i, queue_idx in enumerate(queue_indices_sorted):
+        #     print(f"    Queue {i}: lunghezza={len(all_queues[queue_idx])}, freq={all_queues_f0[queue_idx]:.2f}Hz, frames={all_queues[queue_idx]}")
+        
+        # Itera sulle code dalla più lunga
+        valid_queue_idx = None
+        valid_queue_freq = None
+        valid_queue_frames = None
+        
+        for queue_idx in queue_indices_sorted:
+            queue_freq = all_queues_f0[queue_idx]
+            queue_frames = all_queues[queue_idx]
 
-                peak_time = peak['peak_time']
-                
-                self._log(
-                    f"Canale {channel_num+1:2d}: Picco HNR entro finestra temporale ",
-                    level="OK"
-                )
-                
-                pitch_detector = PitchDetector(
-                    audio_segment=window_of_interest,
-                    sr=self.sr
-                )
-                
-                f0, *_ = pitch_detector.estimate_f0(
-                    plot=self.plot,
-                    **self.pitch_config
-                )
-                
-                # Verifica se f0 è dentro la finestra frequenziale di riferimento
-                if f0 is None:
+            if self.verbose:
+                print(f"  • Analisi coda (Ch {channel_num+1:2d}): lunghezza={len(queue_frames)}, freq={queue_freq:.2f}Hz, frames={queue_frames}")
+            
+            # TEST 1: Controlla frame_idx di riferimento
+            if self.f0_ref_median_frame_idx is not None:
+                if self.f0_ref_median_frame_idx not in queue_frames:
                     self._log(
-                        f"Canale {channel_num+1:2d}: F0 non stimato",
+                        f"Canale {channel_num+1:2d}: Coda non contiene frame_idx {self.f0_ref_median_frame_idx}",
                         level="WARN"
                     )
-                    continue
-                
-                if not (self.search_window.f0_min <= f0 <= self.search_window.f0_max):
-                    self._log(
-                        f"Canale {channel_num+1:2d}: F0={f0:.2f}Hz "
-                        f"fuori finestra [{self.search_window.f0_min:.1f}Hz, "
-                        f"{self.search_window.f0_max:.1f}Hz]",
-                        level="WARN"
-                    )
-                    continue
-                
-                # Picco trovato! Estrai HNR e salva risultato
+                    continue  # Passa alla prossima coda
+            
+            # TEST 2: Verifica frequenza in range
+            if not (self.search_window.f0_min <= queue_freq <= self.search_window.f0_max):
                 self._log(
-                    f"Canale {channel_num+1:2d}: ✓ WHOOP RILEVATO "
-                    f"(f0={f0:.2f}Hz, t={peak_time:.3f}s)",
-                    level="OK"
+                    f"Canale {channel_num+1:2d}: F0={queue_freq:.2f}Hz "
+                    f"fuori finestra [{self.search_window.f0_min:.1f}Hz, {self.search_window.f0_max:.1f}Hz]",
+                    level="WARN"
                 )
-                
-                peak_index = peak.get('peak_index', 0)
-                hnr_db = hnr_values[peak_info[peak_idx]['peak_index']]
-                hnr_linear = 10 ** (hnr_db / 10) if hnr_db is not None else None
-                
-                result.contains_whoop = True
-                result.peak_time = peak_time
-                result.f0 = f0
-                result.hnr_db = hnr_db
-                result.hnr_linear = hnr_linear
-                break  # Accetta il primo picco matching
+                continue  # Passa alla prossima coda
+            
+            # Coda valida trovata!
+            valid_queue_idx = queue_idx
+            valid_queue_freq = queue_freq
+            valid_queue_frames = queue_frames
+            break
+        
+        # ========== STEP 4: VERIFICA RISULTATO ==========
+        if valid_queue_idx is None:
+            self._log(
+                f"Canale {channel_num+1:2d}: Nessuna queue valida trovata",
+                level="WARN"
+            )
+            if self.plot:
+                pitch_detector._plot_results(
+                    np.asarray(pitch_detector.compute_fundamental_frequencies(
+                        freq_min=self.pitch_config['freq_min'],
+                        freq_max=self.pitch_config['freq_max']
+                    )), None, all_queues, None
+                )
+            return result
+        
+        # ========== STEP 5: WHOOP RILEVATO - SALVA RISULTATI ==========
+        peak_time = peak_info[0]['peak_time']
+        peak_index = peak_info[0]['peak_index']
+        hnr_db = hnr_values[peak_index]
+        hnr_linear = 10 ** (hnr_db / 10) if hnr_db is not None else None
+        
+        self._log(
+            f"Canale {channel_num+1:2d}: ✓ WHOOP RILEVATO "
+            f"(f0={valid_queue_freq:.2f}Hz, t={peak_time:.3f}s)",
+            level="OK"
+        )
+        
+        # Plotta con coda evidenziata
+        if self.plot:
+            pitch_detector._plot_results(
+                np.asarray(pitch_detector.compute_fundamental_frequencies(
+                    freq_min=self.pitch_config['freq_min'],
+                    freq_max=self.pitch_config['freq_max']
+                )), valid_queue_frames, all_queues, valid_queue_freq
+            )
+        
+        # Salva risultati
+        result.contains_whoop = True
+        result.peak_time = peak_time
+        result.f0 = valid_queue_freq
+        result.hnr_db = hnr_db
+        result.hnr_linear = hnr_linear
         
         return result
+
 
     def detect_strong_channels(
         self,
@@ -351,12 +419,16 @@ class StrongChannelDetector:
                 self.channel_results.append(result)
                 continue
             
+            
+            
             result = self._analyze_channel(
                 ch,
                 detector_percentile=detector_percentile,
                 detector_offset=detector_offset,
                 detector_window_sec=detector_window_sec
             )
+
+
             self.channel_results.append(result)
         
         return self._aggregate_results()
@@ -443,33 +515,95 @@ class StrongChannelDetector:
         
         return levels
     
-    def listening_test(self, pause_between=0.5):
-        """
-        Estrae la finestra di interesse da ciascuno dei primi N canali
-        e la riproduce in sequenza.
+    # def listening_test(self, pause_between=0.5, save_audios: Optional[bool] = False, folder: Optional[str] = None) -> None:
+    #     """
+    #     Estrae la finestra di interesse da ciascuno dei primi N canali
+    #     e la riproduce in sequenza.
         
-        Args:
-            data (np.ndarray): Array audio (samples, channels)
-            samplerate (int): Frequenza di campionamento
-            start_time (float): Tempo di inizio in secondi
-            end_time (float): Tempo di fine in secondi
-            num_channels (int): Numero di canali da elaborare (default 16)
-            pause_between (float): Pausa tra riproduzioni in secondi
-            channel_broken (int or None): Canali rotti da escludere (default None)
-        """
+    #     Args:
+    #         data (np.ndarray): Array audio (samples, channels)
+    #         samplerate (int): Frequenza di campionamento
+    #         start_time (float): Tempo di inizio in secondi
+    #         end_time (float): Tempo di fine in secondi
+    #         num_channels (int): Numero di canali da elaborare (default 16)
+    #         pause_between (float): Pausa tra riproduzioni in secondi
+    #         channel_broken (int or None): Canali rotti da escludere (default None)
+    #     """
 
+    #     # Converti i tempi in campioni
+    #     test_start_peak = max(0, int((self.start_time_ref - 0.5) * self.sr))
+    #     test_end_peak = min(self.signal_multichannel.shape[0], int((self.end_time_ref + 0.5) * self.sr))
+
+    #     # Estrai il blocco usato per il listening test
+    #     block = self.signal_multichannel[test_start_peak:test_end_peak, :]
+
+    #     # Trova il massimo assoluto su tutti i canali e campioni
+    #     global_max = np.max(np.abs(block))
+
+    #     # Scegli un target (es. 0.8 per stare sotto al clipping)
+    #     target_peak = 40
+
+    #     if global_max > 0:
+    #         gain = target_peak / global_max
+    #     else:
+    #         gain = 1.0
+
+     
+
+        
+    #     print(f"\n{'='*60}")
+    #     print(f"ESTRAZIONE E RIPRODUZIONE WHOOP SIGNAL")
+    #     print(f"Canali considerati: {self.channels_of_interest}")
+    #     print(f"{'='*60}\n")
+
+
+    #     # Loop sui primi N canali
+    #     for ch in self.channels_of_interest:
+    #         if ch in self.broken_channels:
+    #             print(f"▶ Canale {ch+1:2d}: ✗ Canale rotto, salto")
+    #             continue
+    #         else:
+    #             # Estrai la finestra dal canale corrente
+    #             tmp_audio = self.signal_multichannel[test_start_peak:test_end_peak, ch] * gain
+                
+                
+    #             # Output
+    #             print(f"▶ Canale {ch+1:2d}: ", end='', flush=True)
+                
+    #             # Riproduce
+    #             try:
+    #                 sd.play(tmp_audio, samplerate=self.sr, blocking=False)
+    #                 # Attendi la fine della riproduzione
+    #                 sd.wait()
+    #                 print("✓")
+    #             except Exception as e:
+    #                 print(f"✗ Errore: {e}")
+                
+    #             # Pausa tra i canali (se non è l'ultimo)
+    #             if ch < self.channels_of_interest[-1]:
+    #                 time.sleep(pause_between)
+        
+    #     print(f"\n{'='*60}")
+    #     print("✓ Riproduzione completata")
+    #     print(f"{'='*60}\n")
+
+    def play_channel(self, channel_num: int) -> None:
+        """
+        Estrae la finestra di interesse del canale specificato dal segnale multi-canale e la riproduce.
+        
+        """
         # Converti i tempi in campioni
         test_start_peak = max(0, int((self.start_time_ref - 0.5) * self.sr))
         test_end_peak = min(self.signal_multichannel.shape[0], int((self.end_time_ref + 0.5) * self.sr))
 
         # Estrai il blocco usato per il listening test
-        block = self.signal_multichannel[test_start_peak:test_end_peak, :]
+        block = self.signal_multichannel[test_start_peak:test_end_peak, self.channels_of_interest]
 
         # Trova il massimo assoluto su tutti i canali e campioni
         global_max = np.max(np.abs(block))
 
         # Scegli un target (es. 0.8 per stare sotto al clipping)
-        target_peak = 40
+        target_peak = 5
 
         if global_max > 0:
             gain = target_peak / global_max
@@ -480,41 +614,23 @@ class StrongChannelDetector:
 
         
         print(f"\n{'='*60}")
-        print(f"ESTRAZIONE E RIPRODUZIONE WHOOP SIGNAL")
-        print(f"Canali considerati: {self.channels_of_interest}")
+        print(f"ESTRAZIONE E RIPRODUZIONE WHOOP SIGNAL IN CANALE {channel_num+1}")
         print(f"{'='*60}\n")
 
-
-        # Loop sui primi N canali
-        for ch in self.channels_of_interest:
-            if ch in self.broken_channels:
-                print(f"▶ Canale {ch+1:2d}: ✗ Canale rotto, salto")
-                continue
-            else:
-                # Estrai la finestra dal canale corrente
-                tmp_audio = self.signal_multichannel[test_start_peak:test_end_peak, ch] * gain
-                
-                
-                # Output
-                print(f"▶ Canale {ch+1:2d}: ", end='', flush=True)
-                
-                # Riproduce
-                try:
-                    sd.play(tmp_audio, samplerate=self.sr, blocking=False)
-                    # Attendi la fine della riproduzione
-                    sd.wait()
-                    print("✓")
-                except Exception as e:
-                    print(f"✗ Errore: {e}")
-                
-                # Pausa tra i canali (se non è l'ultimo)
-                if ch < self.channels_of_interest[-1]:
-                    time.sleep(pause_between)
+        # Estrai la finestra dal canale corrente
+        tmp_audio = self.signal_multichannel[test_start_peak:test_end_peak, channel_num] * gain
         
-        print(f"\n{'='*60}")
-        print("✓ Riproduzione completata")
-        print(f"{'='*60}\n")
-    
+        
+        # Riproduce
+        try:
+            sd.play(tmp_audio, samplerate=self.sr)
+            # Attendi la fine della riproduzione
+            sd.wait()
+            print("✓")
+        except Exception as e:
+            print(f"✗ Errore: {e}")
+
+
 
     def _voronoi_finite_polygons_2d(self, vor, radius=None):
         """Ritorna regioni Voronoi finite (chiude quelle infinite)."""
@@ -675,6 +791,138 @@ class StrongChannelDetector:
         ax.grid(True, alpha=0.3, linestyle='--')
         plt.tight_layout()
         plt.show()
+
+    # Funzione per generare vertici esagono
+    def _create_hexagon(self, center_x, center_y, radius):
+            """Crea un esagono regolare centrato in (center_x, center_y)"""
+            angles = np.linspace(0, 2*np.pi, 7)  # 7 punti per chiudere il poligono
+            x = center_x + radius * np.cos(angles)
+            y = center_y + radius * np.sin(angles)
+            return np.column_stack([x, y])
+        
+    def plot_hexagon_hnr_map(
+        self,
+        mic_positions: np.ndarray,
+        hexagon_radius: float = 0.5,
+        use_db: bool = False,
+        cmap: str = "hot",
+        boundaries: List[float] = None,
+        show_colorbar: bool = True,
+        title: Optional[str] = None,
+    ) -> None:
+        """
+        Plotta esagoni regolari attorno ai microfoni, colorati in base ai livelli di HNR.
+        Canali rotti evidenziati con pattern tratteggiato.
+        
+        Args:
+            mic_positions: Coordinate dei microfoni
+            hexagon_radius: Raggio dell'esagono (distanza dal centro al vertice)
+            use_db: Se True, usa scala dB per HNR
+            cmap: Colormap da usare
+            boundaries: Limiti del grafico [xmin, xmax, ymin, ymax]
+            show_colorbar: Se mostrare la colorbar
+            title: Titolo del grafico
+        """
+        
+        mic_positions = mic_positions[self.channels_of_interest]
+        fig, ax = plt.subplots(figsize=(12, 10))
+        
+        if boundaries is not None:
+            ax.set_xlim(boundaries[0], boundaries[1])
+            ax.set_ylim(boundaries[2], boundaries[3])
+
+        
+
+        # Broken mask + HNR
+        broken_mask = np.array([ch in self.broken_channels for ch in self.channels_of_interest])
+        hnr_levels = self.get_channel_levels_array()
+        
+        if use_db:
+            hnr_plot = np.where(broken_mask, -999, 
+                                20 * np.log10(np.clip(hnr_levels, 1e-10, None)))
+        else:
+            hnr_plot = np.where(broken_mask, 0.0, hnr_levels)
+        
+        # Normalizzazione HNR (escludendo canali rotti)
+        hnr_nonzero = hnr_plot[~broken_mask]
+        if len(hnr_nonzero) > 0:
+            p05, p95 = np.percentile(hnr_nonzero, [5, 95])
+            norm_hnr = np.clip((hnr_plot - p05) / (p95 - p05), 0, 1)
+        else:
+            norm_hnr = np.zeros_like(hnr_plot)
+        
+        # ColorMap
+        scalar_map = plt.cm.ScalarMappable(norm=plt.Normalize(0, 1), cmap=cmap)
+        colors = scalar_map.to_rgba(norm_hnr)[:, :3]
+        
+        # Disegna esagoni con hatching per canali rotti
+        for i, (x, y) in enumerate(mic_positions):
+            hexagon = self._create_hexagon(x, y, hexagon_radius)
+            
+            if broken_mask[i]:
+                # CANALI ROTTI: colore grigio scuro + hatching + bordo rosso
+                color_hexagon = 'darkgray'
+                alpha_val = 0.9
+                hatch_pattern = '///'
+                edgecolor_hex = 'red'
+                linewidth_hex = 2.5
+            else:
+                # CANALI FUNZIONANTI: colore HNR + bordo nero
+                color_hexagon = colors[i]
+                alpha_val = 0.75
+                hatch_pattern = None
+                edgecolor_hex = 'black'
+                linewidth_hex = 1.5
+            
+            ax.fill(hexagon[:, 0], hexagon[:, 1], 
+                    color=color_hexagon, 
+                    alpha=alpha_val, 
+                    hatch=hatch_pattern,
+                    edgecolor=edgecolor_hex,
+                    linewidth=linewidth_hex,
+                    zorder=1)
+        
+        # Disegna i microfoni (puntini + numeri)
+        mic_colors = ['red' if broken_mask[i] else 'limegreen' for i in range(len(mic_positions))]
+        mic_sizes = [160 if broken_mask[i] else 120 for i in range(len(mic_positions))]
+        
+        scatter = ax.scatter(mic_positions[:, 0], mic_positions[:, 1], 
+                            c=mic_colors, s=mic_sizes, edgecolor='black', linewidth=1, 
+                            zorder=10)
+        
+        # Numeri canale dentro ai puntini
+        for i, (x, y) in enumerate(mic_positions):
+            ax.text(x, y, str(self.channels_of_interest[i] + 1), 
+                    ha='center', va='center', fontsize=7, 
+                    fontweight='bold', color='black', zorder=11)
+        
+        # Colorbar
+        if show_colorbar:
+            cbar = fig.colorbar(scalar_map, ax=ax, shrink=0.8)
+            if use_db:
+                cbar.set_label("HNR (dB)", fontsize=11)
+            else:
+                cbar.set_label("HNR", fontsize=11)
+        
+        # Legenda con hatching per broken channels
+        legend_elements = [
+            Patch(facecolor='darkgray', alpha=0.9, hatch='///', 
+                edgecolor='red', linewidth=2, label='Broken channel'),
+            plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='limegreen', 
+                    markersize=12, label='Working channel', 
+                    markeredgecolor='black', markeredgewidth=1.5)
+        ]
+        
+        ax.legend(handles=legend_elements, loc='upper right', fontsize=11, 
+                frameon=True, fancybox=True, shadow=True)
+        
+        # Impostazioni grafiche
+        ax.set_title(title or "Hexagon HNR Map", fontsize=14, fontweight='bold')
+        ax.set_aspect("equal")
+        ax.grid(True, alpha=0.3, linestyle='--')
+        plt.tight_layout()
+        plt.show()
+
 
 
 

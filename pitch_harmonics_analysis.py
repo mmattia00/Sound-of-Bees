@@ -247,11 +247,10 @@ if __name__ == "__main__":
 
             pitch_detector = PitchDetector(audio_segment=segment, sr=sr)
 
-            f0, queue, all_queues, whoop_info = pitch_detector.estimate_f0(
+            f0, best_queue, all_queues, all_queues_f0, whoop_info = pitch_detector.estimate_f0(
                 length_queue=5, 
                 hz_threshold=25, 
                 threshold_increment=1.3,
-                plot=True,
                 padding_start_ms=5,    # 5ms prima
                 padding_end_ms=25,      # 25ms dopo
                 freq_min=200,
@@ -262,6 +261,8 @@ if __name__ == "__main__":
             # Stampa informazioni sul whoop
             if whoop_info is not None:
                 pitch_detector.print_whoop_info()
+
+                pitch_detector._plot_results(np.asarray(pitch_detector.compute_fundamental_frequencies(freq_min=200, freq_max=600)), best_queue['frame_indices'], all_queues, f0) 
 
                 # to get the absolute start and end samples in the original audio we need outer segment start (present in the name),
                 # the inner segment start (present in peak_windows_) and finally the whoop_info start_sample_padded and end_sample_padded
@@ -279,26 +280,47 @@ if __name__ == "__main__":
                 # esegui analisi armonica
                 # Crea l'analizzatore
                 harmonic_analyzer = HarmonicsAnalyzer(sr=sr, nfft=8192)
-                
-                # Analizza le armoniche
-                harmonics_info = harmonic_analyzer.analyze_harmonics(
-                    whoop_segment=segment,
-                    f0=f0,
-                    center_sample=whoop_info['f0_median_sample'],
-                    window_duration_ms=10,
-                    num_harmonics=10,
-                    bandwidth_hz=50
-                )
-                
-                if harmonics_info is not None:
-                    # Stampa il riassunto
-                    harmonic_analyzer.print_harmonics_summary(harmonics_info, top_n=5)
-                    
-                    # Visualizza i risultati
-                    harmonic_analyzer.plot_harmonics_analysis(harmonics_info, freq_max=5000, highlight_first_n=3)
 
-                    f0_frequencies_final.append(f0)
-                    duration_ms_final.append(whoop_info['duration_padded_ms'])
+                # harmonics_info = harmonic_analyzer.analyze_harmonics(
+                #     whoop_segment=segment,
+                #     f0=f0,
+                #     center_sample=whoop_info['f0_median_sample'],
+                #     window_duration_ms=10,
+                #     num_harmonics=10,
+                #     bandwidth_hz=50
+                # )
+                    
+                # if harmonics_info is not None:
+                #     # Stampa il riassunto
+                #     harmonic_analyzer.print_harmonics_summary(harmonics_info, top_n=5)
+                    
+                #     # Visualizza i risultati
+                #     harmonic_analyzer.plot_harmonics_analysis(harmonics_info, freq_max=5000, highlight_first_n=3)
+
+                #     f0_frequencies_final.append(f0)
+                #     duration_ms_final.append(whoop_info['duration_padded_ms'])
+
+                # harmonics_shr_info = harmonic_analyzer.compute_signal_to_harmonic_ratio(
+                #         whoop_segment=segment,
+                #         f0=f0,
+                #         center_sample=whoop_info['f0_median_sample'],
+                #         window_duration_ms=10,
+                #         num_harmonics=10,
+                #         bandwidth_hz=100
+                #     )
+                
+                # harmonic_analyzer.plot_shr_result(harmonics_shr_info, freq_max=5000)
+
+                shr_average, max_shr, best_f0, best_sample = harmonic_analyzer.validate_f0_trhough_shr(whoop_segment=segment,
+                                                          best_queue_dic=best_queue,
+                                                          window_duration_ms=10,
+                                                            num_harmonics=5,
+                                                            bandwidth_hz=50,
+                                                            plot = False)
+                
+                print(f"SHR Average: {shr_average:.2f}, Max SHR: {max_shr:.2f}, Best F0: {best_f0:.2f} Hz cenetered at sample: {best_sample}")
+
+
             else:
                 print("Nessun whoop rilevato in questo file.")
 

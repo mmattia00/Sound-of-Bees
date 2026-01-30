@@ -590,7 +590,7 @@ def plot_power_map_2d(result: LocalizationResult,
     # Griglia e aspetto
     ax.grid(True, alpha=0.3, linestyle='--')
     ax.set_aspect('equal')
-    ax.legend(loc='upper left', bbox_to_anchor=(-0.5, 1), fontsize=10)
+    # ax.legend(loc='upper left', bbox_to_anchor=(-0.5, 1), fontsize=10)
     
     # Layout ottimizzato
     plt.tight_layout()

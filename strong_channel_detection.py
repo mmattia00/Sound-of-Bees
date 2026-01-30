@@ -231,7 +231,7 @@ def main():
     starting_whoop = "audio_recording_2025-09-15T06_40_43.498109Z_ch04_5.005s_3.505-6.505s.wav"
     # starting_whoop = "audio_recording_2025-09-15T07_18_43.462247Z_ch12_47.135s_45.635-49.295s.wav"
     # starting_whoop = "audio_recording_2025-09-15T06_00_43.664505Z_ch06_24.035s_22.535-25.535s.wav"
-    starting_whoop = "audio_recording_2025-09-15T07_09_45.544480Z_ch07_30.245s_28.745-31.745s.wav"
+    # starting_whoop = "audio_recording_2025-09-15T07_09_45.544480Z_ch07_30.245s_28.745-31.745s.wav" # weird behavior on ch 7
 
     whoops = sorted([f for f in os.listdir(whoops_folder) if f.endswith('.wav')])
 
@@ -278,6 +278,19 @@ def main():
 
         ref_signal = signal_multichannel[start_sample:end_sample, channel_num - 1]
 
+        # play ref signal
+        print(f"\n[{file_idx}/{len(whoops)}] Playing reference signal from channel {channel_num}...")
+        max_val = np.max(np.abs(ref_signal))
+        if max_val > 0:
+            ref_signal = ref_signal / (max_val * 1.1)
+        sd.play(ref_signal, sr)
+        sd.wait()
+
+        # # salva ref signal
+        # dir = "sounds/bees_symposium_audios"
+        # sf.write(f"{dir}/listening_test_ref_ch{channel_num:02d}.wav", ref_signal, sr)
+        # print("Reference signal saved.")
+
         # # 1) Riproduce la finestra su tutti i canali (come prima)
         # extract_and_play_channels(
         #     signal_multichannel,
@@ -294,7 +307,7 @@ def main():
         # ref_signal = signal[start_sample:end_sample, reference_channel]
 
         # Crea detector e analizza
-        detector = StrongChannelDetector(signal_multichannel, sr, channel_num - 1, start_time, end_time, broken_channels=channel_broken, num_channels=16, verbose=True,plot=False)
+        detector = StrongChannelDetector(signal_multichannel, sr, channel_num - 1, start_time, end_time, broken_channels=channel_broken, num_channels=16, verbose=True,plot=True)
         detector.analyze_reference()
         results = detector.detect_strong_channels()
 
@@ -314,12 +327,21 @@ def main():
         channel_coords, boundaries = load_coordinates_with_labels("coordinates/mic_positions_16_ch.txt")
         # remove labels from coordinates
         channel_coords = np.array([(coord['x'], coord['y']) for coord in channel_coords])
-        detector.plot_voronoi_2d(
-            channel_coords[:num_channels_default], 
-            boundaries=boundaries,  # ← QUI!
-            use_db=False, 
-            cmap="hot" 
+        # detector.plot_voronoi_2d(
+        #     channel_coords[:num_channels_default], 
+        #     boundaries=boundaries,  # ← QUI!
+        #     use_db=False, 
+        #     cmap="hot" 
+        # )
+
+        # Dopo aver eseguito detect_strong_channels()
+        detector.plot_hexagon_hnr_map(
+            mic_positions=channel_coords,
+            hexagon_radius=0.025,
+            use_db=False,
+            title="HNR Hexagon Map"
         )
+
 
 if __name__ == "__main__":
     main()
