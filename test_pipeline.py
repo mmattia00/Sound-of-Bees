@@ -75,7 +75,7 @@ def load_coordinates_with_labels(filename: str):
 if __name__ == "__main__":
 
     peaktime_tolerance = 0.02  # secondi
-    wait_time_minutes = 1  # tempo di attesa tra i cicli
+    wait_time_minutes = 30  # tempo di attesa tra i cicli
 
     mics_coords_namefile = "coordinates/mic_positions_32_ch.txt"
     mics_coords, frame_boundaries, mics_labels = load_coordinates_with_labels(mics_coords_namefile)
@@ -85,9 +85,10 @@ if __name__ == "__main__":
     channel_broken = [x - 1 for x in channel_broken]  # zero-based index
 
     # Cartella contenente i file audio raw
-    raw_audio_folder = "E:/soundofbees"
+    # raw_audio_folder = "E:/soundofbees"
+    raw_audio_folder = "/media/uni-konstanz/My Passport/soundofbees" # for testing in the lab
 
-    root_candidates_dir = "sounds/whoop_candidates_splitted_significative"
+    root_candidates_dir = "sounds/whoop_candidates_splitted"
     
     # Variabile per tracciare l'ultimo candidato processato
     last_processed_folder = None

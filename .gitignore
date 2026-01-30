@@ -2,3 +2,8 @@
 \figures
 \sounds
 \old_scripts
+\soundofbees
+__pycache__/
+*.py[cod]
+*$py.class
+whoop_database.h5
