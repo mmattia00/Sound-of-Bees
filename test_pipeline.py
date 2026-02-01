@@ -86,9 +86,11 @@ if __name__ == "__main__":
 
     # Cartella contenente i file audio raw
     # raw_audio_folder = "E:/soundofbees"
-    raw_audio_folder = "/media/uni-konstanz/My Passport/soundofbees" # for testing in the lab
+    # raw_audio_folder = "/media/uni-konstanz/My Passport/soundofbees" # for testing in the lab using the main hard disk
+    raw_audio_folder = "D:/Sound-of-Bees_BACKUP_pt1" # for testing on my laptop using the backup hard disk
 
-    root_candidates_dir = "sounds/whoop_candidates_splitted"
+
+    root_candidates_dir = "sounds/whoop_candidates_splitted_significative"
     
     # Variabile per tracciare l'ultimo candidato processato
     last_processed_folder = None
@@ -179,9 +181,9 @@ if __name__ == "__main__":
                                                channel_broken=channel_broken)
                         
                         # Esegui la pipeline
-                        feats = pipeline.run_full_pipeline(plot_core=False, plot_verbose=False, 
-                                                          verbose=False, listening_test=False, 
-                                                          save_to_database=True)
+                        feats = pipeline.run_full_pipeline(plot_core=True, plot_verbose=False, 
+                                                          verbose=True, listening_test=True, 
+                                                          save_to_database=False)
                         
                         print(f"  │  ✓ Salvato nel database")
                         # print(feats)  # Decommenta se vuoi vedere i dettagli
