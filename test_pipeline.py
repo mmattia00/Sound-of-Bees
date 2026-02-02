@@ -74,6 +74,16 @@ def load_coordinates_with_labels(filename: str):
 
 if __name__ == "__main__":
 
+    figures_characteristics = {
+        'fig_size': (12, 5),
+        'label_fontsize': 14,
+        'title_fontsize': 16,
+        'legend_fontsize': 12,
+        'tick_fontsize': 14,
+        'colorbar_labelsize': 14,    # Label "Power (dB)"
+        'colorbar_ticksize': 12,     # Numeri sulla barra (es: -40, -30...)
+    }
+
     peaktime_tolerance = 0.02  # secondi
     wait_time_minutes = 30  # tempo di attesa tra i cicli
 
@@ -182,8 +192,8 @@ if __name__ == "__main__":
                         
                         # Esegui la pipeline
                         feats = pipeline.run_full_pipeline(plot_core=True, plot_verbose=False, 
-                                                          verbose=True, listening_test=True, 
-                                                          save_to_database=False)
+                                                          verbose=True, listening_test=False, 
+                                                          save_to_database=False, **figures_characteristics)
                         
                         print(f"  │  ✓ Salvato nel database")
                         # print(feats)  # Decommenta se vuoi vedere i dettagli

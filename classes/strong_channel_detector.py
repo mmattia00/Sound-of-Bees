@@ -808,7 +808,7 @@ class StrongChannelDetector:
         cmap: str = "hot",
         boundaries: List[float] = None,
         show_colorbar: bool = True,
-        title: Optional[str] = None,
+        **figures_characteristics
     ) -> None:
         """
         Plotta esagoni regolari attorno ai microfoni, colorati in base ai livelli di HNR.
@@ -821,11 +821,12 @@ class StrongChannelDetector:
             cmap: Colormap da usare
             boundaries: Limiti del grafico [xmin, xmax, ymin, ymax]
             show_colorbar: Se mostrare la colorbar
-            title: Titolo del grafico
         """
         
         mic_positions = mic_positions[self.channels_of_interest]
-        fig, ax = plt.subplots(figsize=(12, 10))
+        fig, ax = plt.subplots(figsize=figures_characteristics.get('fig_size', (12, 10)))
+
+
         
         if boundaries is not None:
             ax.set_xlim(boundaries[0], boundaries[1])
@@ -900,9 +901,22 @@ class StrongChannelDetector:
         if show_colorbar:
             cbar = fig.colorbar(scalar_map, ax=ax, shrink=0.8)
             if use_db:
-                cbar.set_label("HNR (dB)", fontsize=11)
+                cbar.set_label(
+                'HNR (dB)', 
+                size=figures_characteristics.get('colorbar_labelsize', 12),
+                weight='bold',
+                labelpad=15  # ✅ Spaziatura label (punti)
+            )
             else:
-                cbar.set_label("HNR", fontsize=11)
+                cbar.set_label(
+                'HNR', 
+                size=figures_characteristics.get('colorbar_labelsize', 12),
+                weight='bold',
+                labelpad=15  # ✅ Spaziatura label (punti)
+            )
+
+            # Imposta fontsize numeri colorbar
+            cbar.ax.tick_params(labelsize=figures_characteristics.get('colorbar_ticksize', 12))
         
         # Legenda con hatching per broken channels
         legend_elements = [
@@ -913,11 +927,16 @@ class StrongChannelDetector:
                     markeredgecolor='black', markeredgewidth=1.5)
         ]
         
-        ax.legend(handles=legend_elements, loc='upper right', fontsize=11, 
+        ax.legend(handles=legend_elements, loc='upper right', fontsize=figures_characteristics.get('legend_fontsize', 11),
                 frameon=True, fancybox=True, shadow=True)
         
         # Impostazioni grafiche
-        ax.set_title(title or "Hexagon HNR Map", fontsize=14, fontweight='bold')
+        ax.set_title("Strong Channel Detection Map", fontsize=figures_characteristics.get('title_fontsize', 14), fontweight='bold')
+        ax.tick_params(axis='both', which='major', labelsize=figures_characteristics.get('tick_fontsize', 14))
+        ax.set_ylabel('Y (m)', fontsize=figures_characteristics.get('label_fontsize', 12))
+        ax.set_xlabel('X (m)', fontsize=figures_characteristics.get('label_fontsize', 12))
+        # TEMPORANEO limita asse x a 0.25 metri per visualizzare meglio solo i primi 16 canali
+        # ax.set_xlim(left=0.0, right=0.25)
         ax.set_aspect("equal")
         ax.grid(True, alpha=0.3, linestyle='--')
         plt.tight_layout()

@@ -117,7 +117,7 @@ class PipelineDraft:
         self.features.rough_duration = len(self.whoop_audio) / self.sr
         self.features.sr = self.sr  # salva sample rate nei features per uso futuro
 
-    def compute_spectrogram(self, plot: bool = False, title: str = ""):
+    def compute_spectrogram(self, plot: bool = False, title: str = "", **figures_characteristics):
         """Calcola lo spettrogramma una sola volta"""
         nperseg = 1024
         noverlap = nperseg // 2
@@ -142,26 +142,41 @@ class PipelineDraft:
         spectrogram_db = 20 * np.log10(spectrogram_data + 1e-10)
 
         if plot:
-            """Visualizza uno spettrogramma già calcolato"""
-            plt.figure(figsize=(12, 6))
+            plt.figure(figsize=figures_characteristics.get('fig_size', (10, 6)))
 
             vmin = np.nanmax(spectrogram_db) - 80
             vmax = np.nanmax(spectrogram_db)
-        
-            im = plt.pcolormesh(times, frequencies, spectrogram_db, 
+
+            im = plt.pcolormesh(times, frequencies, spectrogram_db,
                                 shading='gouraud', cmap='hot', vmin=vmin, vmax=vmax)
-            
-            plt.ylabel('Frequency (Hz)', fontsize=12)
-            plt.xlabel('Time (s)', fontsize=12)
-            plt.title(title, fontsize=14)
+
+            plt.ylabel('Frequency (Hz)', fontsize=figures_characteristics.get('label_fontsize', 12))
+            plt.xlabel('Time (s)', fontsize=figures_characteristics.get('label_fontsize', 12))
+            plt.title(title, fontsize=figures_characteristics.get('title_fontsize', 14), fontweight='bold')
+            plt.tick_params(axis='both', which='major', labelsize=figures_characteristics.get('ticks_fontsize', 12))
             cbar = plt.colorbar(im, label='Power (dB)')
-            
+
+            # Imposta fontsize label colorbar
+            # CORRETTO: labelpad invece di pad
+            cbar.set_label(
+                'Power (dB)', 
+                size=figures_characteristics.get('colorbar_labelsize', 12),
+                weight='bold',
+                labelpad=15  # ✅ Spaziatura label (punti)
+            )
+
+            # Imposta fontsize numeri colorbar
+            cbar.ax.tick_params(labelsize=figures_characteristics.get('colorbar_ticksize', 12))
+
+
+            # qui aumenti i numerini degli assi
             plt.ylim([0, 20000])
             plt.xlim([times[0], times[-1]])
             plt.show()
+
         
 
-    def extract_pitch_features(self, plot: bool = False, verbose: bool = False) -> Dict[str, Any]:
+    def extract_pitch_features(self, plot: bool = False, verbose: bool = False, **figures_characteristics) -> Dict[str, Any]:
         """PitchDetector → features."""
         detector = PitchDetector(self.whoop_audio, self.sr)
         f0, best_queue_dic, all_queues, all_queues_f0, whoop_pitch_info = detector.estimate_f0(
@@ -192,11 +207,11 @@ class PipelineDraft:
             self.features.f0_mean = f0
 
         if plot:
-            detector._plot_results(np.asarray(detector.compute_fundamental_frequencies(freq_min=200, freq_max=600)), best_queue_dic['frame_indices'], all_queues, f0) 
+            detector._plot_results(np.asarray(detector.compute_fundamental_frequencies(freq_min=200, freq_max=600)), best_queue_dic['frame_indices'], all_queues, f0, **figures_characteristics) 
 
         return best_queue_dic, whoop_pitch_info
 
-    def extract_harmonics_features(self, best_queue_dic: dict, verbose: bool = False, plot_core: bool = False, plot_verbose: bool = False):
+    def extract_harmonics_features(self, best_queue_dic: dict, verbose: bool = False, plot_core: bool = False, plot_verbose: bool = False, **figures_characteristics):
         """Placeholder per future estrazione di feature armoniche."""
 
         harmonic_analyzer = HarmonicsAnalyzer(sr=self.sr, nfft=8192)
@@ -211,7 +226,8 @@ class PipelineDraft:
             prominence_threshold_ratio=0.07,
             plot_core=plot_core,
             plot_verbose=plot_verbose,
-            verbose=verbose
+            verbose=verbose,
+            **figures_characteristics
         )
 
 
@@ -220,7 +236,7 @@ class PipelineDraft:
 
         
 
-    def strongest_channel_detection(self, f0_median_frame_idx: Optional[int] = None, plot_core: bool = False, plot_verbose: bool = False, verbose: bool = False, listening_test: bool = False):
+    def strongest_channel_detection(self, f0_median_frame_idx: Optional[int] = None, plot_core: bool = False, plot_verbose: bool = False, verbose: bool = False, listening_test: bool = False, **figures_characteristics):
         """Placeholder per future estrazione di feature del canale più forte."""
         # Crea detector e analizza
         detector = StrongChannelDetector(signal_multichannel=self.multichannel_audio, 
@@ -259,7 +275,7 @@ class PipelineDraft:
                                             use_db = False,
                                             cmap = "hot",
                                             boundaries = self.frame_boundaries,
-                                            title = f"Strongest Channel Detection for Ch{self.features.ch} Whoop") 
+                                            **figures_characteristics) 
             
             self.features.strongest_channel = results['strongest_channel'].channel_num + 1
             self.features.hnr_levels = np.array(results['all_hnr_levels'])
@@ -267,7 +283,7 @@ class PipelineDraft:
         else:
             print("Nessun canale con whoop rilevato.")
 
-    def precise_whoop_localization(self, validated_channels: List[int], verbose: bool = False, plot: bool = False):
+    def precise_whoop_localization(self, validated_channels: List[int], verbose: bool = False, plot: bool = False, **figures_characteristics):
         mic_array = MicrophoneArray(
                             positions=self.mics_coords,
                             sample_rate=self.sr,
@@ -294,7 +310,7 @@ class PipelineDraft:
 
         if plot:
             # Visualizza il risultato
-            plot_power_map_2d(result, mic_array, grid, ground_truth=None)
+            plot_power_map_2d(result, mic_array, grid, ground_truth=None, **figures_characteristics)
             plt.show()
 
         self.features.precise_localization = np.array(result.estimated_position)
@@ -373,7 +389,8 @@ class PipelineDraft:
 
             print(f"✓ {group_name}")
 
-    def run_full_pipeline(self, plot_core: bool = False, plot_verbose: bool = False, verbose: bool = False, listening_test: bool = False, save_to_database: bool = False) -> WhoopFeatures:
+    def run_full_pipeline(self, plot_core: bool = False, plot_verbose: bool = False, verbose: bool = False, listening_test: bool = False, 
+                          save_to_database: bool = False, **figures_characteristics: Optional[dict] ) -> WhoopFeatures:
             """Esegui tutto → ritorna features."""
             print(f"Pipeline: {self.whoop_candidate_filename}")
             
@@ -403,10 +420,10 @@ class PipelineDraft:
             self.store_feaures_from_params()
 
             # calcola spettrogramma
-            self.compute_spectrogram(plot=plot_core, title=f"Spectrogram Ch{self.features.ch} Peak@{self.features.peak_time:.3f}s [day {self.features.date} time {self.features.time}]")      
+            self.compute_spectrogram(plot=plot_core, title=f"Spectrogram of Whoop Candidate Ch{self.features.ch}", **figures_characteristics)      
 
             # estrai feature di pitch
-            best_queue_dic, whoop_pitch_info = self.extract_pitch_features(plot=plot_core, verbose=verbose)
+            best_queue_dic, whoop_pitch_info = self.extract_pitch_features(plot=plot_core, verbose=verbose, **figures_characteristics)
 
             # se il pitch è stato rilevato, prosegui con feature extraction
             if whoop_pitch_info is not None:
@@ -416,12 +433,13 @@ class PipelineDraft:
                     best_queue_dic=best_queue_dic,
                     verbose=verbose,
                     plot_core=plot_core,
-                    plot_verbose=plot_verbose
+                    plot_verbose=plot_verbose,
+                    **figures_characteristics
                 )
 
                 
                 # strongest channel detection
-                self.strongest_channel_detection(whoop_pitch_info['f0_median_frame_idx'],plot_core=plot_core, plot_verbose=plot_verbose, verbose=verbose, listening_test=listening_test)
+                self.strongest_channel_detection(whoop_pitch_info['f0_median_frame_idx'],plot_core=plot_core, plot_verbose=plot_verbose, verbose=verbose, listening_test=listening_test, **figures_characteristics)
 
                 # se ho almeno 6 canali con whoop rilevato, posso fare la localizzazione precisa
                 if self.features.num_channels_with_whoop is not None and self.features.num_channels_with_whoop >= 6:
@@ -437,7 +455,7 @@ class PipelineDraft:
                     validated_channels.sort()
                     print(f"Canali usati per localizzazione precisa: {[ch + 1 for ch in validated_channels]}")
                     
-                    self.precise_whoop_localization(validated_channels, verbose=verbose, plot=plot_core)
+                    self.precise_whoop_localization(validated_channels, verbose=verbose, plot=plot_core, **figures_characteristics)
                 else:
                     print("Non posso fare localizzazione precisa (<6 canali con whoop rilevato). Passa al prossimo candidate whoop")
 

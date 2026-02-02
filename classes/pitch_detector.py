@@ -59,8 +59,8 @@ class PitchDetector:
 
         return fundamental_frequencies
     
-    def _plot_results(self, freq_array, best_queue_indices, all_queues, f0):
-        plt.figure(figsize=(12, 6))
+    def _plot_results(self, freq_array, best_queue_indices, all_queues, f0, **figures_characteristics):
+        plt.figure(figsize=figures_characteristics.get('fig_size', (12, 6)))
         
         if self.hop_length is not None and self.sr is not None:
             x_axis = np.arange(len(freq_array)) * self.hop_length / self.sr
@@ -98,14 +98,15 @@ class PitchDetector:
         else:
             plt.text(0.5, 0.5, 'No valid queue found', 
                     transform=plt.gca().transAxes, 
-                    fontsize=14, color='red', ha='center', va='center')
+                    fontsize=figures_characteristics.get('label_fontsize', 14), color='red', ha='center', va='center')
         
-        plt.xlabel(x_label, fontsize=12)
-        plt.ylabel('Frequency (Hz)', fontsize=12)
-        plt.title(f'f0 Analysis{title_suffix}', 
-                fontsize=14, fontweight='bold')
+        plt.xlabel(x_label, fontsize=figures_characteristics.get('label_fontsize', 12))
+        plt.ylabel('Frequency (Hz)', fontsize=figures_characteristics.get('label_fontsize', 12))
+        plt.title(f'Fundamental Frequency Estimation', 
+                fontsize=figures_characteristics.get('title_fontsize', 14), fontweight='bold')
+        plt.tick_params(axis='both', which='major', labelsize=figures_characteristics.get('tick_fontsize', 10))
         plt.grid(True, alpha=0.3, linestyle='--')
-        plt.legend(loc='best', fontsize=10)
+        plt.legend(loc='best', fontsize=figures_characteristics.get('legend_fontsize', 12))
         plt.tight_layout()
         plt.show()
 

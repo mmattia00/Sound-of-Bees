@@ -188,7 +188,7 @@ class HarmonicsAnalyzer:
     
 
     def plot_spectrum_with_peaks(self, spectrum, freqs, harmonic_frequencies, 
-                            peaks, bandwidth_hz=50, f0=None, freq_max=5000):
+                            peaks, bandwidth_hz=50, f0=None, freq_max=5000, **figures_characteristics):
         """
         Plotta spettro con:
         - Picchi evidenziati (punti rossi)
@@ -217,7 +217,7 @@ class HarmonicsAnalyzer:
         # Limita le frequenze visualizzate
         idx_max = np.argmin(np.abs(freqs - freq_max))
         
-        plt.figure(figsize=(14, 6))
+        plt.figure(figsize=figures_characteristics.get('fig_size', (10, 6)))
         
         # Plot spettro
         plt.plot(freqs[:idx_max], spectrum[:idx_max], color='black', linewidth=1, alpha=0.6)
@@ -247,17 +247,17 @@ class HarmonicsAnalyzer:
                 edgecolors='darkred', linewidth=1.5, zorder=5, label='Detected peaks')
         
         # Formattazione
-        plt.xlabel('Frequency (Hz)', fontsize=11)
-        plt.ylabel('Magnitude', fontsize=11)
+        plt.xlabel('Frequency (Hz)', fontsize=figures_characteristics.get('label_fontsize', 12))
+        plt.ylabel('Magnitude', fontsize=figures_characteristics.get('label_fontsize', 12))
         
         title = 'Spectrum with Peaks and Harmonic Bands'
         if f0 is not None:
             title += f' (f₀ = {f0:.1f} Hz)'
-        plt.title(title, fontsize=12, fontweight='bold')
-        
+        plt.title(title, fontsize=figures_characteristics.get('title_fontsize', 14), fontweight='bold')
+        plt.tick_params(axis='both', which='major', labelsize=figures_characteristics.get('tick_fontsize', 10))
         plt.xlim(0, freq_max)
         plt.grid(True, alpha=0.3)
-        plt.legend(loc='upper right')
+        plt.legend(loc='upper right', fontsize=figures_characteristics.get('legend_fontsize', 12))
         plt.tight_layout()
         plt.show()
 
@@ -269,7 +269,8 @@ class HarmonicsAnalyzer:
                             prominence_threshold_ratio=0.1,
                             plot_core=False,
                             plot_verbose=False,
-                            verbose=False):
+                            verbose=False, 
+                            **figures_characteristics):
         """
         Calcola metriche di allineamento spettrale per validare la struttura armonica.
         
@@ -344,7 +345,8 @@ class HarmonicsAnalyzer:
                     peaks=peaks,
                     bandwidth_hz=bandwidth_hz,
                     f0=f0,
-                    freq_max=5000
+                    freq_max=5000,
+                    **figures_characteristics
                 )
             
             alignment_details_list.append({

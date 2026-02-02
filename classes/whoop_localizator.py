@@ -510,10 +510,10 @@ def reshape_power_map(result: LocalizationResult,
 def plot_power_map_2d(result: LocalizationResult, 
                       mic_array: MicrophoneArray,
                       search_grid: SearchGrid,
-                      figsize: Tuple[int, int] = (12, 8),
                       cmap: str = 'viridis',
                       show_colorbar: bool = True, 
-                      ground_truth: Tuple[float, float] = None) -> None:
+                      ground_truth: Tuple[float, float] = None,
+                      **figures_characteristics) -> None:
     """
     Visualizza la power map 2D con i microfoni sovrapposti.
     
@@ -540,7 +540,7 @@ def plot_power_map_2d(result: LocalizationResult,
     X, Y, Z = reshape_power_map(result, search_grid)
     
     # Crea la figura
-    fig, ax = plt.subplots(figsize=figsize)
+    fig, ax = plt.subplots(figsize=figures_characteristics.get('fig_size', (10, 6)))
     
     # Plot della heatmap
     contour = ax.contourf(X, Y, Z, levels=20, cmap=cmap)
@@ -580,17 +580,28 @@ def plot_power_map_2d(result: LocalizationResult,
     # Aggiunge la barra di colori
     if show_colorbar:
         cbar = plt.colorbar(contour, ax=ax, label='SRP Power')
+        cbar.set_label(
+                'SRP Power', 
+                size=figures_characteristics.get('colorbar_labelsize', 12),
+                weight='bold',
+                labelpad=15  # ✅ Spaziatura label (punti)
+            )
+
+        # Imposta fontsize numeri colorbar
+        cbar.ax.tick_params(labelsize=figures_characteristics.get('colorbar_ticksize', 12))
     
     # Etichette e titolo
-    ax.set_xlabel('X [m]', fontsize=12, fontweight='bold')
-    ax.set_ylabel('Y [m]', fontsize=12, fontweight='bold')
-    ax.set_title(f'SRP Power Map - Estimated Position: ({est_pos[0]:.4f}, {est_pos[1]:.4f})\nMax Power: {result.max_power:.6f}', 
-                fontsize=14, fontweight='bold')
-    
+    ax.set_xlabel('X (m)', fontsize=figures_characteristics.get('label_fontsize', 12))
+    ax.set_ylabel('Y (m)', fontsize=figures_characteristics.get('label_fontsize', 12))
+    ax.set_title(f'SRP Power Map\nEstimated Position: ({est_pos[0]:.4f}, {est_pos[1]:.4f}) m', 
+                fontsize=figures_characteristics.get('title_fontsize', 14), fontweight='bold')
+    ax.tick_params(axis='both', which='major', labelsize=figures_characteristics.get('ticks_fontsize', 12))
+
+    # TEMPORANEO limita asse x a 0.21 metri per visualizzare meglio solo i primi 16 canali
+    # ax.set_xlim(left=0.0, right=0.21)
     # Griglia e aspetto
     ax.grid(True, alpha=0.3, linestyle='--')
     ax.set_aspect('equal')
-    # ax.legend(loc='upper left', bbox_to_anchor=(-0.5, 1), fontsize=10)
     
     # Layout ottimizzato
     plt.tight_layout()
