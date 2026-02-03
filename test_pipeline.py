@@ -191,8 +191,8 @@ if __name__ == "__main__":
                                                channel_broken=channel_broken)
                         
                         # Esegui la pipeline
-                        feats = pipeline.run_full_pipeline(plot_core=True, plot_verbose=False, 
-                                                          verbose=True, listening_test=False, 
+                        feats = pipeline.run_full_pipeline(plot_core=True, plot_verbose=True, 
+                                                          verbose=True, listening_test=True, 
                                                           save_to_database=False, **figures_characteristics)
                         
                         print(f"  │  ✓ Salvato nel database")
