@@ -24,7 +24,11 @@ if __name__ == "__main__":
 
     filename_whoop_test = 'audio_recording_2025-09-15T06_40_43.498109Z_ch_04_peaktime_5.005_windowstart_4.755_windowend_5.255_hnrvalue_7.53'
     # database_path = 'E:/whoop_database.h5' # the real one on the hard drive
-    database_path = "database_analysis/whoop_database_test.h5"
+    # database_path = "database_analysis/whoop_database_test.h5" # for running on the real database on my laptop
+    # database_path = "/media/uni-konstanz/My Passport/whoop_database_test.h5" # for testing in the lab computer
+    database_path = "/media/uni-konstanz/My Passport/whoop_database.h5" # for running on the real database but in the lab computer
+
+
 
     database_analyzer = DatabaseAnalyzer(database_path)
 
