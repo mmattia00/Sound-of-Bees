@@ -5,6 +5,7 @@ from classes.whoop_detector import WhoopDetector
 from classes.whoop_localizator import MicrophoneArray, SRPLocalizator, plot_power_map_2d
 import matplotlib.pyplot as plt
 import os
+from classes.audio_syncronizer import AudioSynchronizer
 
 
 def load_coordinates_with_labels(filename: str):
@@ -73,8 +74,9 @@ def get_ground_truth_coordinates(filename, localization_points_coords):
 
 def main():
 
-    num_channels_analyzed = 16
-    channel_coords, boundaries = load_coordinates_with_labels("coordinates/mic_positions_16_ch.txt")
+    delay_samples = 2873 # valore di delay stimato in fase di calibrazione per sincronizzare i primi 16 canali (scheda audio 1) con i secondi 16 canali (scheda audio 2)
+    num_channels_analyzed = 32
+    channel_coords, boundaries = load_coordinates_with_labels("coordinates/mic_positions_32_ch.txt")
     # remove labels from coordinates
     channel_coords = np.array([(coord['x'], coord['y']) for coord in channel_coords])
     localization_points_coords = load_coordinates_with_labels("coordinates/localization_points.txt")
@@ -96,7 +98,7 @@ def main():
     
     # esegui la localizzazione su tutti i file di test nella cartella sounds/localization_test
     folder = "sounds/localization_test/noisy"
-    starting_audiofile_name = "noisy_Point_i.wav"
+    starting_audiofile_name = "noisy_Point_d.wav"
     
     # Trova tutti i file .wav nella cartella
     audio_files = sorted([f for f in os.listdir(folder) if f.endswith('.wav')])
@@ -121,9 +123,11 @@ def main():
     print("="*80 + "\n")
 
     for file in audio_files:
-
+        syncronizer = AudioSynchronizer(delay_samples=delay_samples)
         raw_multichannel_audio_filename = os.path.join(folder, file)
         raw_multichannel_audio, sr = sf.read(raw_multichannel_audio_filename, dtype='float32')
+        # raw_multichannel_audio, sr = syncronizer.load_synchronized_multichannel_audio(raw_multichannel_audio_filename)
+
 
         ground_truth_coords = get_ground_truth_coordinates(raw_multichannel_audio_filename, localization_points_coords)
         print(f"Ground truth coordinates: {ground_truth_coords}")
@@ -176,13 +180,13 @@ def main():
         start_sec, end_sec = final_window
         print(f"Finestra finale calcolata: {start_sec:.3f}s - {end_sec:.3f}s")
 
-        for idx in range(num_channels_analyzed):
-            if idx in channels_broken:
-                continue
+        # for idx in range(num_channels_analyzed):
+        #     if idx in channels_broken:
+        #         continue
 
-            channel_data = raw_multichannel_audio[int(start_sec*sr):int(end_sec*sr), idx]
-            sd.play(channel_data, sr)
-            sd.wait()
+        #     channel_data = raw_multichannel_audio[int(start_sec*sr):int(end_sec*sr), idx]
+        #     sd.play(channel_data, sr)
+        #     sd.wait()
 
 
 
@@ -195,9 +199,17 @@ def main():
                     margin=0.00
                 )
         
+        pairs = mic_array.get_all_pairs()
+        print("N pairs:", len(pairs))
+        print("Prime 20 coppie:", pairs[:20])
+
+        # quante coppie cross-scheda?
+        cross_pairs = [(i, j) for (i, j) in pairs if (i < 16 and j >= 16) or (i >= 16 and j < 16)]
+        print("Coppie cross-scheda:", len(cross_pairs))
+
         localizer = SRPLocalizator(mic_array, c=343.0)
 
-        grid = localizer.create_search_grid_full(resolution=0.02)
+        grid = localizer.create_search_grid_full(resolution=0.005)
 
 
         signals = raw_multichannel_audio[int(start_sec*sr):int(end_sec*sr), :num_channels_analyzed]

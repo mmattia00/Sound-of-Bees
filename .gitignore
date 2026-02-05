@@ -6,4 +6,4 @@
 __pycache__/
 *.py[cod]
 *$py.class
-whoop_database.h5
+*.h5

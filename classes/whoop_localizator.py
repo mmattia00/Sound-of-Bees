@@ -129,6 +129,16 @@ class MicrophoneArray:
             pairs.append((reference_channel, i))
         
         return pairs
+    
+    def get_only_cross_audio_interface_pairs(self) -> List[Tuple[int, int]]:
+        pairs = self.get_all_pairs()
+        print("N pairs:", len(pairs))
+        print("Prime 20 coppie:", pairs[:20])
+
+        # quante coppie cross-scheda?
+        cross_pairs = [(i, j) for (i, j) in pairs if (i < 16 and j >= 16) or (i >= 16 and j < 16)]
+        print("Coppie cross-scheda:", len(cross_pairs))
+        return cross_pairs
 
 
 @dataclass
@@ -363,6 +373,7 @@ class SRPLocalizator:
             print(f"  Using reference channel {self.reference_channel}: {len(pairs)} pairs")
         else:
             pairs = self.mic_array.get_all_pairs()
+            # pairs = self.mic_array.get_only_cross_audio_interface_pairs()
             print(f"  Using all pairs: {len(pairs)} pairs")
         
         for i, j in pairs:

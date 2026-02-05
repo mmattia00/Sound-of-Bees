@@ -11,7 +11,7 @@ def main():
     audio_source_1 = audio_multichannel[:, 15]  # Primo canale (mic della prima scheda audio)
     audio_source_2 = audio_multichannel[:, 18]  # Secondo canale (mic della seconda scheda audio)
     
-    synchronizer = AudioSynchronizer(audio_source_1, audio_source_2, sr, verbose=True, plot=True)
+    synchronizer = AudioSynchronizer(audio_source_1=audio_source_1, audio_source_2=audio_source_2, sr=sr, verbose=True, plot=True)
     
     
     result = synchronizer.gcc_phat()
