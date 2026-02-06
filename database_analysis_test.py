@@ -1,34 +1,33 @@
 from classes.database_analyzer import DatabaseAnalyzer
+import platform
+import socket
 
 
-
-# def get_all_whoops_df(hdf5_path: str):
-#     """Ritorna DataFrame con scalari di TUTTI i whoop."""
-#     data_list = []
+def get_database_path():
+    """Auto-detect path basato su hostname/OS."""
+    hostname = socket.gethostname()
     
-#     with h5py.File(hdf5_path, 'r') as f:
-#         for group_name in f.keys():
-#             grp = f[group_name]
-            
-#             data = load_whoop_by_id(hdf5_path, group_name)
-#             data['group_name'] = group_name
-#             data_list.append(data)
-            
-#     df = pd.DataFrame(data_list)
-#     return df
-
+    # Laptop
+    if platform.system() == "Windows":
+        return "E:/whoop_database.h5"
+    
+    # Lab desktop
+    elif platform.system() == "Linux":
+        return "database_analysis/whoop_database.h5"
+    
+    raise ValueError("Percorso database non definito per questo sistema: " + hostname)
 
 
 
 if __name__ == "__main__":
 
     filename_whoop_test = 'audio_recording_2025-09-15T06_40_43.498109Z_ch_04_peaktime_5.005_windowstart_4.755_windowend_5.255_hnrvalue_7.53'
-    database_path = 'E:/whoop_database.h5' # for running the on the real database (in the hard drive) from my laptop
+    # database_path = 'E:/whoop_database.h5' # for running the on the real database (in the hard drive) from my laptop
     # database_path = "database_analysis/whoop_database_test.h5" # for running tests on my laptop
     # database_path = "/media/uni-konstanz/My Passport/whoop_database_test.h5" # for testing in the lab computer
     # database_path = "/media/uni-konstanz/My Passport/whoop_database.h5" # for running on the real database but in the lab computer
 
-
+    database_path = get_database_path()
 
     database_analyzer = DatabaseAnalyzer(database_path)
 
@@ -53,7 +52,6 @@ if __name__ == "__main__":
     database_analyzer._plot_histogram_distribution(df, "num_channels_with_whoop", bins="auto", is_discrete=True)
 
 
-    # database_analyzer.extract_avg_values_parallel(ids_csv_path="database_analysis/f0_not_nan_ids.csv", output_csv="database_analysis/whoop_raw_stats.csv")
 
     # 1. Carica singolo
     # data = database_analyzer.load_whoop_by_id(filename_whoop_test)
@@ -61,13 +59,7 @@ if __name__ == "__main__":
 
     # 2. Plot spectrogram
     # database_analyzer.plot_spectrogram_from_db(filename_whoop_test, sr=data['sr']) 
-    # 3. Analisi tutti
-    # df = get_all_whoops_df(database_path)
-    # check how many rows in the dataframe
-    # print(f"Totale whoop nel DB: {len(df)}")
-    # printa le prime 10 righe
-    # high_f0 = df[df.f0_mean > 400]
-    # print(f"Whoop forti: {len(high_f0)}")
+    
 
 
 
