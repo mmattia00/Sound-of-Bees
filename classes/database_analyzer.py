@@ -8,6 +8,7 @@ import os
 import matplotlib.pyplot as plt
 import h5py
 from joblib import Parallel, delayed
+from classes.strong_channel_detector import StrongChannelDetector
 
 
 def parallelize_joblib(n_jobs=-1, default_verbose=10):
@@ -72,86 +73,6 @@ class DatabaseAnalyzer:
         if key not in grp:
             return np.nan
         return dtype(val)
-
-    def load_whoop_by_id(self, group_name: str):
-        """
-        Carica TUTTI i dati di un whoop specifico (18+ features).
-        """
-        data = {}
-        
-        with h5py.File(self.database_path, 'r') as f:
-            if group_name not in f:
-                raise ValueError(f"Whoop '{group_name}' non trovato!")
-            
-            grp = f[group_name]
-            
-            # ===== ATTRS (stringhe) =====
-            data['date'] = grp.attrs.get('date', '')
-            data['time'] = grp.attrs.get('time', '')
-            
-            # ===== SCALARI ===== (tutti i tuoi!) sempre presenti
-            data['ch'] = int(grp['ch'][()])
-            data['peak_time'] = float(grp['peak_time'][()])
-            data['start_peak'] = float(grp['start_peak'][()])
-            data['end_peak'] = float(grp['end_peak'][()])
-            data['rough_duration'] = float(grp['rough_duration'][()])
-            data['sr'] = int(grp['sr'][()])
-            
-            # SCALARI NON SEMPRE PRESENTI (POTREBBERO ESSERE Nan e creare problemi)
-            # con float non ci sono problemi a leggere NaN
-            data['f0_mean'] = float(grp['f0_mean'][()])
-            data['precise_start_peak'] = float(grp['precise_start_peak'][()])
-            data['precise_end_peak'] = float(grp['precise_end_peak'][()])
-            data['precise_duration'] = float(grp['precise_duration'][()])
-            data['weighted_shr'] = float(grp['weighted_shr'][()])
-
-            # con int usiamo funzione apposta
-            data['max_aligned_peaks'] = self._safe_get_scalar_integer(grp, 'max_aligned_peaks', int)
-            data['strongest_channel'] = self._safe_get_scalar_integer(grp, 'strongest_channel', int)
-            data['num_channels_with_whoop'] = self._safe_get_scalar_integer(grp, 'num_channels_with_whoop', int)
-            
-            # ===== ARRAY ===== (tutti i tuoi!) alcuni potrebbero essere vuoti
-                
-            data['hnr_levels'] = np.array(grp['hnr_levels'])
-            data['precise_localization'] = np.array(grp['precise_localization'])
-            data['spectrogram_dB'] = np.array(grp['spectrogram_dB'])
-            data['spec_frequencies'] = np.array(grp['spec_frequencies'])
-            data['spec_times'] = np.array(grp['spec_times'])
-        
-        print(f"✓ Caricato {group_name}: "
-            f"F0={data['f0_mean']:.1f}Hz, Ch{data['ch']}→{data['strongest_channel']}, "
-            f"Loc={data['precise_localization']}")
-        return data
-
-
-    def plot_spectrogram_from_db(self, group_name: str, sr: int = 48000):
-        """Plotta spectrogram salvato."""
-        data = self.load_whoop_by_id(group_name)
-        
-        if 'spectrogram_dB' not in data:
-            print("❌ Spectrogram non trovato")
-            return
-        
-        plt.figure(figsize=(12, 6))
-
-        spectrogram_db = data['spectrogram_dB']
-        frequencies = data['spec_frequencies']
-        times = data['spec_times']
-
-        vmin = np.nanmax(spectrogram_db) - 80
-        vmax = np.nanmax(spectrogram_db)
-
-        im = plt.pcolormesh(times, frequencies, spectrogram_db, 
-                            shading='gouraud', cmap='hot', vmin=vmin, vmax=vmax)
-        
-        plt.ylabel('Frequency (Hz)', fontsize=12)
-        plt.xlabel('Time (s)', fontsize=12)
-        plt.title("title", fontsize=14)
-        cbar = plt.colorbar(im, label='Power (dB)')
-        
-        plt.ylim([0, 20000])
-        plt.xlim([times[0], times[-1]])
-        plt.show()
 
     def pretest_f0_filter(self, output_csv='f0_not_nan_ids.csv'):
         """
@@ -257,3 +178,102 @@ class DatabaseAnalyzer:
             plt.title(f"Distribuzione {column}")
             plt.grid(axis="y", alpha=0.3)
             plt.show()
+    
+    def load_whoop_by_id(self, group_name: str):
+        """
+        Carica TUTTI i dati di un whoop specifico (18+ features).
+        """
+        data = {}
+        
+        with h5py.File(self.database_path, 'r') as f:
+            if group_name not in f:
+                raise ValueError(f"Whoop '{group_name}' non trovato!")
+            
+            grp = f[group_name]
+            
+            # ===== ATTRS (stringhe) =====
+            data['date'] = grp.attrs.get('date', '')
+            data['time'] = grp.attrs.get('time', '')
+            
+            # ===== SCALARI ===== (tutti i tuoi!) sempre presenti
+            data['ch'] = int(grp['ch'][()])
+            data['peak_time'] = float(grp['peak_time'][()])
+            data['start_peak'] = float(grp['start_peak'][()])
+            data['end_peak'] = float(grp['end_peak'][()])
+            data['rough_duration'] = float(grp['rough_duration'][()])
+            data['sr'] = int(grp['sr'][()])
+            
+            # SCALARI NON SEMPRE PRESENTI (POTREBBERO ESSERE Nan e creare problemi)
+            # con float non ci sono problemi a leggere NaN
+            data['f0_mean'] = float(grp['f0_mean'][()])
+            data['precise_start_peak'] = float(grp['precise_start_peak'][()])
+            data['precise_end_peak'] = float(grp['precise_end_peak'][()])
+            data['precise_duration'] = float(grp['precise_duration'][()])
+            data['weighted_shr'] = float(grp['weighted_shr'][()])
+
+            # con int usiamo funzione apposta
+            data['max_aligned_peaks'] = self._safe_get_scalar_integer(grp, 'max_aligned_peaks', int)
+            data['strongest_channel'] = self._safe_get_scalar_integer(grp, 'strongest_channel', int)
+            data['num_channels_with_whoop'] = self._safe_get_scalar_integer(grp, 'num_channels_with_whoop', int)
+            
+            # ===== ARRAY ===== (tutti i tuoi!) alcuni potrebbero essere vuoti
+                
+            data['hnr_levels'] = np.array(grp['hnr_levels'])
+            data['precise_localization'] = np.array(grp['precise_localization'])
+            data['spectrogram_dB'] = np.array(grp['spectrogram_dB'])
+            data['spec_frequencies'] = np.array(grp['spec_frequencies'])
+            data['spec_times'] = np.array(grp['spec_times'])
+        
+        print(f"✓ Caricato {group_name}: "
+            f"F0={data['f0_mean']:.1f}Hz, Ch{data['ch']}→{data['strongest_channel']}, "
+            f"Loc={data['precise_localization']}")
+        return data
+
+
+    def plot_spectrogram_from_db(self, db_data: dict):
+        """Plotta spectrogram salvato."""
+        
+        if 'spectrogram_dB' not in db_data:
+            print("❌ Spectrogram non trovato")
+            return
+        
+        plt.figure(figsize=(12, 6))
+
+        spectrogram_db = db_data['spectrogram_dB']
+        frequencies = db_data['spec_frequencies']
+        times = db_data['spec_times']
+
+        vmin = np.nanmax(spectrogram_db) - 80
+        vmax = np.nanmax(spectrogram_db)
+
+        im = plt.pcolormesh(times, frequencies, spectrogram_db, 
+                            shading='gouraud', cmap='hot', vmin=vmin, vmax=vmax)
+        
+        plt.ylabel('Frequency (Hz)', fontsize=12)
+        plt.xlabel('Time (s)', fontsize=12)
+        plt.title("title", fontsize=14)
+        cbar = plt.colorbar(im, label='Power (dB)')
+        
+        plt.ylim([0, 20000])
+        plt.xlim([times[0], times[-1]])
+        plt.show()
+
+    def plot_localization(self, db_data: dict):
+        pass  # TODO: plot della localizzazione precisa (es. canali vs tempo)
+
+
+    def complete_whoop_analysis_by_id(self, group_name: str):
+        """Analisi completa di un whoop specifico."""
+        data = self.load_whoop_by_id(group_name)
+        
+        # Qui puoi aggiungere tutte le analisi che vuoi, ad es.:
+        print(f"📊 Analisi completa per {group_name}:")
+        print(f"F0: {data['f0_mean']:.1f} Hz")
+        print(f"Durata precisa: {data['precise_duration']:.2f} s")
+        print(f"Weighted SHR: {data['weighted_shr']:.2f}")
+        print(f"Max Alignments: {data['max_aligned_peaks']}")
+        print(f"HNR max: {np.nanmax(data['hnr_levels']):.2f} dB")
+        print(f"Num canali con whoop: {data['num_channels_with_whoop']}")
+        
+        # Esempio: plot dello spectrogram
+        self.plot_spectrogram_from_db(data)
