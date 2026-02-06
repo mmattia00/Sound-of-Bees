@@ -1,14 +1,69 @@
+import multiprocessing as mp
+from multiprocessing import Pool
+from functools import wraps
 import pandas as pd
-import h5py
 import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import librosa
 import time
+import os
+import matplotlib.pyplot as plt
+import h5py
+from joblib import Parallel, delayed
+
+
+def parallelize_joblib(n_jobs=-1, default_verbose=10):
+    """
+    DECORATOR UNIVERSALE con joblib + progress bar.
+    
+    Args:
+        n_jobs: Numero core (-1 = tutti, int = specifico)
+        verbose: Progress bar (0=off, 10=standard, 50=dettagliato)
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            self = args[0]  # Analyzer instance
+            ids_csv_path = kwargs.pop('ids_csv_path', None)
+            verbose = kwargs.pop('verbose', default_verbose)
+            
+            # Carica IDs
+            if ids_csv_path and os.path.exists(ids_csv_path):
+                group_ids = pd.read_csv(ids_csv_path, header=None)[0].tolist()
+                print(f"📂 {len(group_ids):,} IDs da {ids_csv_path}")
+            else:
+                import h5py
+                with h5py.File(self.database_path, 'r') as f:
+                    group_ids = list(f.keys())
+                print(f"📂 {len(group_ids):,} IDs totali")
+            
+            cores = mp.cpu_count() if n_jobs == -1 else n_jobs
+            print(f"🚀 Parallel {cores} cores su {len(group_ids):,} IDs")
+            
+            start = time.time()
+            
+            # MAGIA JOBLIB con progress bar!
+            results = Parallel(n_jobs=n_jobs, backend='loky', verbose=verbose)(
+                delayed(func)(self, gid, *args[1:], **kwargs) for gid in group_ids
+            )
+            
+            elapsed = time.time() - start
+            print(f"✅ {elapsed:.0f}s ({len(group_ids)/elapsed:.0f} IDs/s)")
+            
+            # Aggrega risultati
+            results = [r for r in results if r is not None]
+            if results and isinstance(results[0], dict):
+                return pd.DataFrame(results)
+            elif results and isinstance(results[0], pd.DataFrame):
+                return pd.concat(results, ignore_index=True)
+            return results
+        
+        return wrapper
+    return decorator
 
 class DatabaseAnalyzer:
     def __init__(self, database_path):
         self.database_path = database_path
+
+    
     
     def _safe_get_scalar_integer(self, grp, key, dtype=int):  # o float
         val = grp[key][()]
@@ -140,3 +195,65 @@ class DatabaseAnalyzer:
             f"Good: {stats['f0_valid']:,} → {output_csv}")
         
         return stats
+
+    @parallelize_joblib(n_jobs=-1,  default_verbose=10)  # ← MAGIA!
+    def extract_avg_values(self, gid):  # UN SOLO ID!
+        """Processa 1 whoop, restituisce dict."""
+        with h5py.File(self.database_path, "r") as f:
+            if gid not in f: return None
+            grp = f[gid]
+
+            # Leggi scalari (riusa la tua logica)
+            f0 = float(grp["f0_mean"][()])
+            precise_duration = float(grp["precise_duration"][()])
+            weighted_shr = float(grp["weighted_shr"][()])
+            max_alignments = self._safe_get_scalar_integer(grp, "max_aligned_peaks", int)
+            num_channels = self._safe_get_scalar_integer(grp, "num_channels_with_whoop", int)
+
+            # HNR: ad es. massimo sul canale strong
+            hnr_levels = np.array(grp["hnr_levels"])
+            hnr = float(np.nanmax(hnr_levels)) if hnr_levels.size > 0 else np.nan
+            
+            return {
+                'id': gid,
+                'f0': f0,
+                'precise_duration': precise_duration,
+                'weighted_shr': weighted_shr,
+                'max_alignments': max_alignments,
+                'hnr': hnr,
+                'num_channels_with_whoop': num_channels
+            }
+
+    def _plot_histogram_distribution(self, df, column: str, bins="auto", is_discrete=False):
+        """
+        Istogramma tipo 'grafico a barre' per la colonna indicata.
+        - se is_discrete=True: barre per valori interi (0,1,2,...)
+        - altrimenti: bins continui stile istogramma.
+        """
+        data = df[column].dropna().values
+
+        if is_discrete:
+            # Per interi, usa value_counts ordinato → barre pulite
+            counts = pd.Series(data).value_counts().sort_index()
+            x = counts.index.values
+            y = counts.values
+            plt.figure(figsize=(10, 5))
+            plt.bar(x, y, width=0.8, align="center")
+            plt.xlabel(column)
+            plt.ylabel("Count")
+            plt.title(f"Distribuzione {column}")
+            plt.grid(axis="y", alpha=0.3)
+            plt.show()
+        else:
+            # Continua: np.histogram → barre
+            hist, edges = np.histogram(data, bins=bins)
+            centers = (edges[:-1] + edges[1:]) / 2
+            width = edges[1] - edges[0]
+
+            plt.figure(figsize=(10, 5))
+            plt.bar(centers, hist, width=width, align="center")
+            plt.xlabel(column)
+            plt.ylabel("Count")
+            plt.title(f"Distribuzione {column}")
+            plt.grid(axis="y", alpha=0.3)
+            plt.show()
