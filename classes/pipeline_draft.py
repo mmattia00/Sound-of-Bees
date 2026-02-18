@@ -10,6 +10,7 @@ from classes.pitch_detector import PitchDetector
 from classes.harmonics_analyzer import HarmonicsAnalyzer
 from classes.strong_channel_detector import StrongChannelDetector
 from classes.whoop_localizator import MicrophoneArray, SRPLocalizator, plot_power_map_2d
+from classes.utils import Utils
 import numpy as np
 import sounddevice as sd
 import h5py
@@ -270,7 +271,13 @@ class PipelineDraft:
                 #     use_db=False, 
                 #     cmap="hot" 
                 # )
-                detector.plot_hexagon_hnr_map(mic_positions = self.mics_coords,
+
+      
+
+                Utils.plot_hexagon_hnr_map(hnr_levels=results['all_hnr_levels'],
+                                            mic_positions = self.mics_coords,
+                                            channels_of_interest=detector.channels_of_interest,
+                                            broken_channels=detector.broken_channels,
                                             hexagon_radius=0.025, 
                                             use_db = False,
                                             cmap = "hot",
@@ -397,27 +404,21 @@ class PipelineDraft:
             # carica raw signal multichannel e whoop segment
             self.load_audios()
 
-            if listening_test:
-                print(f"   - Riproduzione segmento whoop (finestra un po' più ampia)")
-                test_start = max(0, int((self.params['start_peak'] - 0.5) * self.sr))
-                test_end = min(self.multichannel_audio.shape[0], int((self.params['end_peak'] + 0.5) * self.sr))
-                test_whoop_audio = self.multichannel_audio[test_start:test_end, self.params['ch'] - 1]
-                # Normalizza per evitare clipping
-                max_val = np.max(np.abs(test_whoop_audio))
-                if max_val > 0:
-                    test_whoop_audio = test_whoop_audio / (max_val * 1.1)
-
-                # # salva test in un file
-                # dir = "sounds/bees_symposium_audios"
-                # sf.write(f"{dir}/listening_test_{self.whoop_candidate_filename}", test_whoop_audio, self.sr)
-
-                sd.play(test_whoop_audio, self.sr)
-                sd.wait()
-                # aspetta mezzo secondo prima di continuare
-                sd.sleep(500)
-
             # estrai feature da filename del whoop come channel, start_peak, ecc.              
             self.store_feaures_from_params()
+
+            if listening_test:
+                
+
+                Utils.extract_and_play_audio_segment_from_raw_multichannel_audio(
+                    raw_audio_path=f"{self.root_raw_audio_dir}/{self.parent_filename}.wav",
+                    start_time=self.features.start_peak,
+                    end_time=self.features.end_peak,
+                    channel=self.features.ch - 1,  # zero-based index
+                    lenght_extension=1.0  # durata totale del segmento da riprodurre (in secondi)
+                )
+
+
 
             # calcola spettrogramma
             self.compute_spectrogram(plot=plot_core, title=f"Spectrogram of Whoop Candidate Ch{self.features.ch}", **figures_characteristics)      

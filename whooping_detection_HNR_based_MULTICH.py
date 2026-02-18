@@ -8,9 +8,11 @@ import os
 if __name__ == "__main__":
     # Cartella contenente i file audio
     # raw_audio_folder = "E:\soundofbees"
-    raw_audio_folder = "/media/uni-konstanz/My Passport/soundofbees" # for testing in the lab
+    # raw_audio_folder = "/media/uni-konstanz/My Passport/soundofbees" # for testing in the lab
+    raw_audio_folder = "sounds/whoop_examples/testing_pipeline" # for testing on example files
     # candidates_folder = "sounds\whoop_candidates_splitted" # nuova struttura di cartelle dove ogni .wav è più breve e centralizzato attorno al picco e hopefully contiene esattamente solo un whoop
-    candidates_folder = "/home/uni-konstanz/Desktop/Sound_of_bees/Sound-of-Bees/sounds/whoop_candidates_splitted" # for testing in the lab
+    # candidates_folder = "/home/uni-konstanz/Desktop/Sound_of_bees/Sound-of-Bees/sounds/whoop_candidates_splitted" # for testing in the lab
+    candidates_folder = "sounds/whoop_examples/whoop_candidates_splitted" # for testing on example files
     
     
     # starting_audiofile_name = "audio_recording_2025-09-15T00_00_43.625108Z.wav" # il primo file di quelli presenti nel hard disk in locale

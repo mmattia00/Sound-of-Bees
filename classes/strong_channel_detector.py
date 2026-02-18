@@ -792,155 +792,169 @@ class StrongChannelDetector:
         plt.tight_layout()
         plt.show()
 
-    # Funzione per generare vertici esagono
-    def _create_hexagon(self, center_x, center_y, radius):
-            """Crea un esagono regolare centrato in (center_x, center_y)"""
-            angles = np.linspace(0, 2*np.pi, 7)  # 7 punti per chiudere il poligono
-            x = center_x + radius * np.cos(angles)
-            y = center_y + radius * np.sin(angles)
-            return np.column_stack([x, y])
+    # # Funzione per generare vertici esagono
+    # def _create_hexagon(self, center_x, center_y, radius):
+    #         """Crea un esagono regolare centrato in (center_x, center_y)"""
+    #         angles = np.linspace(0, 2*np.pi, 7)  # 7 punti per chiudere il poligono
+    #         x = center_x + radius * np.cos(angles)
+    #         y = center_y + radius * np.sin(angles)
+    #         return np.column_stack([x, y])
+
+    # @staticmethod
+    # def plot_hexagon_hnr_map(
+    #     self,
+    #     hnr_levels: np.ndarray = np.array([]),
+    #     broken_channels: List[int] = None,
+    #     channels_of_interest: List[int] = None,
+    #     mic_positions: np.ndarray = np.array([]),
+    #     hexagon_radius: float = 0.5,
+    #     use_db: bool = False,
+    #     cmap: str = "hot",
+    #     boundaries: List[float] = None,
+    #     show_colorbar: bool = True,
+    #     **figures_characteristics
+    # ) -> None:
+    #     """
+    #     Plotta esagoni regolari attorno ai microfoni, colorati in base ai livelli di HNR.
+    #     Canali rotti evidenziati con pattern tratteggiato.
         
-    def plot_hexagon_hnr_map(
-        self,
-        mic_positions: np.ndarray,
-        hexagon_radius: float = 0.5,
-        use_db: bool = False,
-        cmap: str = "hot",
-        boundaries: List[float] = None,
-        show_colorbar: bool = True,
-        **figures_characteristics
-    ) -> None:
-        """
-        Plotta esagoni regolari attorno ai microfoni, colorati in base ai livelli di HNR.
-        Canali rotti evidenziati con pattern tratteggiato.
+    #     Args:
+    #         mic_positions: Coordinate dei microfoni
+    #         hexagon_radius: Raggio dell'esagono (distanza dal centro al vertice)
+    #         use_db: Se True, usa scala dB per HNR
+    #         cmap: Colormap da usare
+    #         boundaries: Limiti del grafico [xmin, xmax, ymin, ymax]
+    #         show_colorbar: Se mostrare la colorbar
+    #     """
         
-        Args:
-            mic_positions: Coordinate dei microfoni
-            hexagon_radius: Raggio dell'esagono (distanza dal centro al vertice)
-            use_db: Se True, usa scala dB per HNR
-            cmap: Colormap da usare
-            boundaries: Limiti del grafico [xmin, xmax, ymin, ymax]
-            show_colorbar: Se mostrare la colorbar
-        """
-        
-        mic_positions = mic_positions[self.channels_of_interest]
-        fig, ax = plt.subplots(figsize=figures_characteristics.get('fig_size', (12, 10)))
+    #     mic_positions = mic_positions[self.channels_of_interest]
+    #     fig, ax = plt.subplots(figsize=figures_characteristics.get('fig_size', (12, 10)))
 
 
         
-        if boundaries is not None:
-            ax.set_xlim(boundaries[0], boundaries[1])
-            ax.set_ylim(boundaries[2], boundaries[3])
+    #     if boundaries is not None:
+    #         ax.set_xlim(boundaries[0], boundaries[1])
+    #         ax.set_ylim(boundaries[2], boundaries[3])
 
         
 
-        # Broken mask + HNR
-        broken_mask = np.array([ch in self.broken_channels for ch in self.channels_of_interest])
-        hnr_levels = self.get_channel_levels_array()
+    #     # Broken mask + HNR
+    #     if broken_channels is None:
+    #         broken_channels = self.broken_channels
+
+    #     if channels_of_interest is None:
+    #         channels_of_interest = self.channels_of_interest
+
+    #     broken_mask = np.array([ch in broken_channels for ch in channels_of_interest])
+    #     if hnr_levels.size == 0:
+    #         hnr_levels = self.get_channel_levels_array()
+
         
-        if use_db:
-            hnr_plot = np.where(broken_mask, -999, 
-                                20 * np.log10(np.clip(hnr_levels, 1e-10, None)))
-        else:
-            hnr_plot = np.where(broken_mask, 0.0, hnr_levels)
         
-        # Normalizzazione HNR (escludendo canali rotti)
-        hnr_nonzero = hnr_plot[~broken_mask]
-        if len(hnr_nonzero) > 0:
-            p05, p95 = np.percentile(hnr_nonzero, [5, 95])
-            norm_hnr = np.clip((hnr_plot - p05) / (p95 - p05), 0, 1)
-        else:
-            norm_hnr = np.zeros_like(hnr_plot)
         
-        # ColorMap
-        scalar_map = plt.cm.ScalarMappable(norm=plt.Normalize(0, 1), cmap=cmap)
-        colors = scalar_map.to_rgba(norm_hnr)[:, :3]
+    #     if use_db:
+    #         hnr_plot = np.where(broken_mask, -999, 
+    #                             20 * np.log10(np.clip(hnr_levels, 1e-10, None)))
+    #     else:
+    #         hnr_plot = np.where(broken_mask, 0.0, hnr_levels)
         
-        # Disegna esagoni con hatching per canali rotti
-        for i, (x, y) in enumerate(mic_positions):
-            hexagon = self._create_hexagon(x, y, hexagon_radius)
+    #     # Normalizzazione HNR (escludendo canali rotti)
+    #     hnr_nonzero = hnr_plot[~broken_mask]
+    #     if len(hnr_nonzero) > 0:
+    #         p05, p95 = np.percentile(hnr_nonzero, [5, 95])
+    #         norm_hnr = np.clip((hnr_plot - p05) / (p95 - p05), 0, 1)
+    #     else:
+    #         norm_hnr = np.zeros_like(hnr_plot)
+        
+    #     # ColorMap
+    #     scalar_map = plt.cm.ScalarMappable(norm=plt.Normalize(0, 1), cmap=cmap)
+    #     colors = scalar_map.to_rgba(norm_hnr)[:, :3]
+        
+    #     # Disegna esagoni con hatching per canali rotti
+    #     for i, (x, y) in enumerate(mic_positions):
+    #         hexagon = self._create_hexagon(x, y, hexagon_radius)
             
-            if broken_mask[i]:
-                # CANALI ROTTI: colore grigio scuro + hatching + bordo rosso
-                color_hexagon = 'darkgray'
-                alpha_val = 0.9
-                hatch_pattern = '///'
-                edgecolor_hex = 'red'
-                linewidth_hex = 2.5
-            else:
-                # CANALI FUNZIONANTI: colore HNR + bordo nero
-                color_hexagon = colors[i]
-                alpha_val = 0.75
-                hatch_pattern = None
-                edgecolor_hex = 'black'
-                linewidth_hex = 1.5
+    #         if broken_mask[i]:
+    #             # CANALI ROTTI: colore grigio scuro + hatching + bordo rosso
+    #             color_hexagon = 'darkgray'
+    #             alpha_val = 0.9
+    #             hatch_pattern = '///'
+    #             edgecolor_hex = 'red'
+    #             linewidth_hex = 2.5
+    #         else:
+    #             # CANALI FUNZIONANTI: colore HNR + bordo nero
+    #             color_hexagon = colors[i]
+    #             alpha_val = 0.75
+    #             hatch_pattern = None
+    #             edgecolor_hex = 'black'
+    #             linewidth_hex = 1.5
             
-            ax.fill(hexagon[:, 0], hexagon[:, 1], 
-                    color=color_hexagon, 
-                    alpha=alpha_val, 
-                    hatch=hatch_pattern,
-                    edgecolor=edgecolor_hex,
-                    linewidth=linewidth_hex,
-                    zorder=1)
+    #         ax.fill(hexagon[:, 0], hexagon[:, 1], 
+    #                 color=color_hexagon, 
+    #                 alpha=alpha_val, 
+    #                 hatch=hatch_pattern,
+    #                 edgecolor=edgecolor_hex,
+    #                 linewidth=linewidth_hex,
+    #                 zorder=1)
         
-        # Disegna i microfoni (puntini + numeri)
-        mic_colors = ['red' if broken_mask[i] else 'limegreen' for i in range(len(mic_positions))]
-        mic_sizes = [160 if broken_mask[i] else 120 for i in range(len(mic_positions))]
+    #     # Disegna i microfoni (puntini + numeri)
+    #     mic_colors = ['red' if broken_mask[i] else 'limegreen' for i in range(len(mic_positions))]
+    #     mic_sizes = [160 if broken_mask[i] else 120 for i in range(len(mic_positions))]
         
-        scatter = ax.scatter(mic_positions[:, 0], mic_positions[:, 1], 
-                            c=mic_colors, s=mic_sizes, edgecolor='black', linewidth=1, 
-                            zorder=10)
+    #     scatter = ax.scatter(mic_positions[:, 0], mic_positions[:, 1], 
+    #                         c=mic_colors, s=mic_sizes, edgecolor='black', linewidth=1, 
+    #                         zorder=10)
         
-        # Numeri canale dentro ai puntini
-        for i, (x, y) in enumerate(mic_positions):
-            ax.text(x, y, str(self.channels_of_interest[i] + 1), 
-                    ha='center', va='center', fontsize=7, 
-                    fontweight='bold', color='black', zorder=11)
+    #     # Numeri canale dentro ai puntini
+    #     for i, (x, y) in enumerate(mic_positions):
+    #         ax.text(x, y, str(channels_of_interest[i] + 1), 
+    #                 ha='center', va='center', fontsize=7, 
+    #                 fontweight='bold', color='black', zorder=11)
         
-        # Colorbar
-        if show_colorbar:
-            cbar = fig.colorbar(scalar_map, ax=ax, shrink=0.8)
-            if use_db:
-                cbar.set_label(
-                'HNR (dB)', 
-                size=figures_characteristics.get('colorbar_labelsize', 12),
-                weight='bold',
-                labelpad=15  # ✅ Spaziatura label (punti)
-            )
-            else:
-                cbar.set_label(
-                'HNR', 
-                size=figures_characteristics.get('colorbar_labelsize', 12),
-                weight='bold',
-                labelpad=15  # ✅ Spaziatura label (punti)
-            )
+    #     # Colorbar
+    #     if show_colorbar:
+    #         cbar = fig.colorbar(scalar_map, ax=ax, shrink=0.8)
+    #         if use_db:
+    #             cbar.set_label(
+    #             'HNR (dB)', 
+    #             size=figures_characteristics.get('colorbar_labelsize', 12),
+    #             weight='bold',
+    #             labelpad=15  # ✅ Spaziatura label (punti)
+    #         )
+    #         else:
+    #             cbar.set_label(
+    #             'HNR', 
+    #             size=figures_characteristics.get('colorbar_labelsize', 12),
+    #             weight='bold',
+    #             labelpad=15  # ✅ Spaziatura label (punti)
+    #         )
 
-            # Imposta fontsize numeri colorbar
-            cbar.ax.tick_params(labelsize=figures_characteristics.get('colorbar_ticksize', 12))
+    #         # Imposta fontsize numeri colorbar
+    #         cbar.ax.tick_params(labelsize=figures_characteristics.get('colorbar_ticksize', 12))
         
-        # Legenda con hatching per broken channels
-        legend_elements = [
-            Patch(facecolor='darkgray', alpha=0.9, hatch='///', 
-                edgecolor='red', linewidth=2, label='Broken channel'),
-            plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='limegreen', 
-                    markersize=12, label='Working channel', 
-                    markeredgecolor='black', markeredgewidth=1.5)
-        ]
+    #     # Legenda con hatching per broken channels
+    #     legend_elements = [
+    #         Patch(facecolor='darkgray', alpha=0.9, hatch='///', 
+    #             edgecolor='red', linewidth=2, label='Broken channel'),
+    #         plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='limegreen', 
+    #                 markersize=12, label='Working channel', 
+    #                 markeredgecolor='black', markeredgewidth=1.5)
+    #     ]
         
-        ax.legend(handles=legend_elements, loc='upper right', fontsize=figures_characteristics.get('legend_fontsize', 11),
-                frameon=True, fancybox=True, shadow=True)
+    #     ax.legend(handles=legend_elements, loc='upper right', fontsize=figures_characteristics.get('legend_fontsize', 11),
+    #             frameon=True, fancybox=True, shadow=True)
         
-        # Impostazioni grafiche
-        ax.set_title("Strong Channel Detection Map", fontsize=figures_characteristics.get('title_fontsize', 14), fontweight='bold')
-        ax.tick_params(axis='both', which='major', labelsize=figures_characteristics.get('tick_fontsize', 14))
-        ax.set_ylabel('Y (m)', fontsize=figures_characteristics.get('label_fontsize', 12))
-        ax.set_xlabel('X (m)', fontsize=figures_characteristics.get('label_fontsize', 12))
-        # TEMPORANEO limita asse x a 0.25 metri per visualizzare meglio solo i primi 16 canali
-        # ax.set_xlim(left=0.0, right=0.25)
-        ax.set_aspect("equal")
-        ax.grid(True, alpha=0.3, linestyle='--')
-        plt.tight_layout()
-        plt.show()
+    #     # Impostazioni grafiche
+    #     ax.set_title("Strong Channel Detection Map", fontsize=figures_characteristics.get('title_fontsize', 14), fontweight='bold')
+    #     ax.tick_params(axis='both', which='major', labelsize=figures_characteristics.get('tick_fontsize', 14))
+    #     ax.set_ylabel('Y (m)', fontsize=figures_characteristics.get('label_fontsize', 12))
+    #     ax.set_xlabel('X (m)', fontsize=figures_characteristics.get('label_fontsize', 12))
+    #     # TEMPORANEO limita asse x a 0.25 metri per visualizzare meglio solo i primi 16 canali
+    #     # ax.set_xlim(left=0.0, right=0.25)
+    #     ax.set_aspect("equal")
+    #     ax.grid(True, alpha=0.3, linestyle='--')
+    #     plt.tight_layout()
+    #     plt.show()
 
 
 
