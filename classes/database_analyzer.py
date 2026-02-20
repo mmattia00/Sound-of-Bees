@@ -19,6 +19,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import pytz
 from matplotlib.patches import Patch
+import soundfile as sf
 
 
 
@@ -1000,26 +1001,29 @@ class DatabaseAnalyzer:
         durations = []
         strong_channels = []
         peak_times_absolute = []
+        num_channels_with_whoop = []
 
         for id in ids:
             data = self.load_whoop_by_id(id)
             f0_values.append(data['f0_mean'])
             durations.append(data['precise_duration'])
+            num_channels_with_whoop.append(data['num_channels_with_whoop'])
             strong_channels.append(data['strongest_channel'])
+            
             date = data['date']
             time = data['time']
             peak_time_relative = data['peak_time']
-
-
             peak_times_absolute.append(
                 datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S.%f") + timedelta(seconds=peak_time_relative)
             )
+
         
 
 
         # Plots distribuzione
-        self._plot_histogram_distribution(f0_values, "f0", bins=8) # metti bins="auto" quando hai tanti valori
-        self._plot_histogram_distribution(durations, "precise_duration", bins=8)
+        self._plot_histogram_distribution(f0_values, "f0", bins="auto") # metti bins="auto" quando hai tanti valori
+        self._plot_histogram_distribution(durations, "precise_duration", bins="auto")
+        self._plot_histogram_distribution(num_channels_with_whoop, "num_channels_with_whoop", bins="auto", is_discrete=True)  # bins per valori discreti da 0 a 32
 
         start_time = datetime(2025, 9, 15, 0, 0, 0)   # 2025-09-15 00:00:00
         end_time = datetime(2025, 9, 21, 0, 0, 0)     # 2025-09-21 00:00:00
@@ -1030,3 +1034,86 @@ class DatabaseAnalyzer:
 
 
 
+
+    def make_collection_of_sounds_out_of_a_cluster(
+        self,
+        input_csv_path: str,
+        output_dir: str,
+        root_raw_audio_dir: str,
+        extra_padding: float = 0.0,
+    ) -> str:
+        """
+        Dato un CSV con una colonna 'id' che contiene gli HDF5 group_name dei whoop,
+        estrae tutti i segmenti dal raw multicanale e li concatena in un unico file .wav.
+
+        - input_csv_path: path al CSV del cluster (colonna 'id')
+        - output_dir: cartella di destinazione per il file finale
+        - root_raw_audio_dir: directory dove stanno i .wav grezzi multicanale
+        - extra_padding: padding aggiuntivo (in secondi) prima e dopo ogni whoop
+        Ritorna: percorso del file .wav creato.
+        """
+
+        print(f"Tutti i whoop del cluster: {input_csv_path} verrano concatenati in un unico file audio.")
+        os.makedirs(output_dir, exist_ok=True)
+
+        # leggi gli id dal csv
+        ids = pd.read_csv(input_csv_path).id.tolist()
+
+        all_segments = []
+        sr_out = None
+
+        for i, gid in enumerate(ids):
+            print(f"Processing whoop {i+1}/{len(ids)}")
+            data = self.load_whoop_by_id(gid, verbose=False)
+
+            parent_filename = data["parent_filename"]
+            ch  = int(data["strongest_channel"]) - 1
+            sr  = int(data["sr"])
+
+            raw_path = os.path.join(root_raw_audio_dir, f"{parent_filename}.wav")
+
+            start_t = max(0.0, float(data["start_peak"]) - extra_padding)
+            end_t   = float(data["end_peak"]) + extra_padding
+
+            with sf.SoundFile(raw_path) as f:
+                if f.samplerate != sr:
+                    raise ValueError(f"Sample rate mismatch per {raw_path}: {f.samplerate} vs {sr}")
+
+                start_sample = max(0, int(start_t * sr))
+                end_sample   = min(f.frames, int(end_t * sr))  # ✅ f.frames invece di multich_audio.shape[0]
+
+                f.seek(start_sample)
+                block = f.read(end_sample - start_sample, dtype='float64')
+
+            seg = block[:, ch]
+            del block  # libera i 32 canali, tieni solo il mono
+            # Normalizza per evitare clipping
+            max_val = np.max(np.abs(seg))
+            if max_val > 0:
+                seg = seg / (max_val * 1.1)
+            all_segments.append(seg)
+
+            if sr_out is None:
+                sr_out = sr
+
+
+        if not all_segments:
+            raise ValueError("Nessun whoop trovato nel cluster, niente da concatenare.")
+
+        # concatena tutti i segmenti uno dopo l'altro
+        concatenated = np.concatenate(all_segments, axis=0)
+
+        # # normalizzazione soft per evitare clipping
+        # max_val = np.max(np.abs(concatenated))
+        # if max_val > 0:
+        #     concatenated = concatenated / (max_val * 1.05)
+
+        # nome file di output basato sul nome del cluster
+        csv_base = os.path.splitext(os.path.basename(input_csv_path))[0]  # es. "CLUSTER_1_VALIDATED_ids"
+        cluster_name = csv_base.split("_VALIDATED")[0]  # → "CLUSTER_1"
+        out_path = os.path.join(output_dir, f"{cluster_name}_whoops_collection.wav")
+
+        sf.write(out_path, concatenated, samplerate=sr_out)
+        print(f"✓ Salvata collezione whoops cluster in: {out_path}")
+
+        return out_path

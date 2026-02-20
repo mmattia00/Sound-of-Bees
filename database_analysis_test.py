@@ -387,24 +387,28 @@ if __name__ == "__main__":
     #     root_raw_audio_dir=root_raw_audio_dir
     # )
 
-    database_analyzer.extract_statistics_from_cluster(
-        input_csv_path="database_analysis/CLUSTER_1_VALIDATED_ids.csv")
+    # database_analyzer.extract_statistics_from_cluster(
+    #     input_csv_path="database_analysis/CLUSTER_1_VALIDATED_ids.csv")
+
+    # database_analyzer.make_collection_of_sounds_out_of_a_cluster(
+    # input_csv_path="database_analysis/CLUSTER_1_VALIDATED_ids.csv",
+    # output_dir="sounds/clusters_collections",
+    # root_raw_audio_dir=root_raw_audio_dir,
+    # extra_padding=0.25)
 
     
-
-
-
-
-
-    # # #################################################################################################
-    # # ########### CERCA IN TUTTI I CANDIDATI WHOOP NON NULLI I PIU SIMILI A example_2.wav   ###########
-    # # #################################################################################################
+    #################################################################################################
+    ###################################### CLUSTER 2 ################################################
+    #################################################################################################
+    #################################################################################################
+    ########### CERCA IN TUTTI I CANDIDATI WHOOP NON NULLI I PIU SIMILI A example_2.wav   ###########
+    #################################################################################################
     # df = pd.read_csv("database_analysis/whoop_raw_stats.csv")
     
     # f0_range = [430, 470] 
-    # duration_range = [0.110, 0.190] # from Nies's paper
-    # weighted_shr_min = 0.10 # terzo quartile della distribuzione su tutti i nostri dati (75% dei whoop hanno weighted_shr minore o uguale a 0.150)
-    # max_alignments_min = 7 # terzo quartile della distribuzione su tutti i nostri dati (75% dei whoop hanno max_alignments minore o uguale a 5)
+    # duration_range = [0.110, 0.190] 
+    # weighted_shr_min = 0.1 
+    # max_alignments_min = 7
 
     # print(f"\nTOTALE INIZIALE: {len(df):,} whoop\n")
 
@@ -414,7 +418,7 @@ if __name__ == "__main__":
     # print(f"  Duration:        mean={df.precise_duration.mean():.3f}s, Q1={df.precise_duration.quantile(0.25):.3f}, Q3={df.precise_duration.quantile(0.75):.3f}")
     # print(f"  Weighted SHR:    mean={df.weighted_shr.mean():.3f}, Q1={df.weighted_shr.quantile(0.25):.3f}, Q3={df.weighted_shr.quantile(0.75):.3f}")
     # print(f"  Max alignments:  mean={df.max_alignments.mean():.1f}, Q1={df.max_alignments.quantile(0.25):.0f}, Q3={df.max_alignments.quantile(0.75):.0f}")
-
+    # print(f"  HNR:             mean={df.hnr.mean():.1f}, Q1={df.hnr.quantile(0.25):.1f}, Q3={df.hnr.quantile(0.75):.1f}")
     # print("\n" + "="*70)
     # print("APPLICAZIONE FILTRI (PROGRESSIVA)")
     # print("="*70)
@@ -439,36 +443,19 @@ if __name__ == "__main__":
     # print(f"    Rimangono: {len(df_filtered):,}/{len(df):,} ({pct:.1f}%)")
     # print(f"    Scartati in questo step: {prev_count - len(df_filtered):,}")
 
-    # # Filtro 3: Weighted SHR
-    # mask_shr = df_filtered.weighted_shr >= weighted_shr_min
+    # # Filtro 3 (raffinato): qualità = SHR alto OR max_alignments alto
+    # mask_quality = (
+    #     (df_filtered.weighted_shr >= weighted_shr_min) |
+    #     (df_filtered.max_alignments >= max_alignments_min)
+    # )
     # prev_count = len(df_filtered)
-    # df_filtered = df_filtered[mask_shr]
+    # df_filtered = df_filtered[mask_quality]
+
     # pct = len(df_filtered)/len(df)*100
-    # print(f"\n3️⃣  Weighted SHR >= {weighted_shr_min:.3f} (Q3)")
+    # print(f"\n3️⃣  Quality gate: weighted_shr >= {weighted_shr_min:.3f} OR max_alignments >= {max_alignments_min}")
     # print(f"    Rimangono: {len(df_filtered):,}/{len(df):,} ({pct:.1f}%)")
     # print(f"    Scartati in questo step: {prev_count - len(df_filtered):,}")
 
-    # # Filtro 4: Max alignments
-    # mask_align = df_filtered.max_alignments >= max_alignments_min
-    # prev_count = len(df_filtered)
-    # df_filtered = df_filtered[mask_align]
-    # pct = len(df_filtered)/len(df)*100
-    # print(f"\n4️⃣  Max alignments >= {max_alignments_min} (Q3)")
-    # print(f"    Rimangono: {len(df_filtered):,}/{len(df):,} ({pct:.1f}%)")
-    # print(f"    Scartati in questo step: {prev_count - len(df_filtered):,}")
-
-    # # # Filtro 3 (raffinato): qualità = SHR alto OR max_alignments alto
-    # # mask_quality = (
-    # #     (df_filtered.weighted_shr >= weighted_shr_min) |
-    # #     (df_filtered.max_alignments >= max_alignments_min)
-    # # )
-    # # prev_count = len(df_filtered)
-    # # df_filtered = df_filtered[mask_quality]
-
-    # # pct = len(df_filtered)/len(df)*100
-    # # print(f"\n3️⃣  Quality gate: weighted_shr >= {weighted_shr_min:.3f} OR max_alignments >= {max_alignments_min}")
-    # # print(f"    Rimangono: {len(df_filtered):,}/{len(df):,} ({pct:.1f}%)")
-    # # print(f"    Scartati in questo step: {prev_count - len(df_filtered):,}")
 
 
 
@@ -487,21 +474,124 @@ if __name__ == "__main__":
     # print(f"  Max alignments:  mean={df_filtered.max_alignments.mean():.1f} (range: {df_filtered.max_alignments.min():.0f}-{df_filtered.max_alignments.max():.0f})")
     # print(f"  HNR:             mean={df_filtered.hnr.mean():.3f} (range: {df_filtered.hnr.min():.3f}-{df_filtered.hnr.max():.3f})")
 
-    # # save ids of good whoop in a new CSV
-    # df_filtered[["id"]].to_csv("database_analysis/whoop_similar_to_ex2_ids.csv", index=False)
-
-    # # analizza i whoop simili a example_2.wav
-    # ids = pd.read_csv("database_analysis/whoop_similar_to_ex2_ids.csv").id.tolist()
-    # for id in ids:
-    #     database_analyzer.complete_whoop_analysis_by_id(id, root_raw_audio_dir=root_raw_audio_dir)
+    # # save ids of good whoop in a new CSV THE NON VALIDATED ONE
+    # df_filtered[["id"]].to_csv("database_analysis/CLUSTER_2_ids.csv", index=False)
 
 
+    # # analizza tutti i whoop del cluster 2 per validarli manualmente e mettere in un nuovo CSV quelli validati come buoni (da ascoltare e verificare uno ad uno) 
+    # database_analyzer.validate_cluster(
+    #     input_csv_path="database_analysis/CLUSTER_2_ids.csv",
+    #     output_csv_path="database_analysis/CLUSTER_2_VALIDATED_ids.csv",
+    #     root_raw_audio_dir=root_raw_audio_dir
+    # )
+
+    # database_analyzer.extract_statistics_from_cluster(
+    #     input_csv_path="database_analysis/CLUSTER_2_VALIDATED_ids.csv")
+    
+    # database_analyzer.make_collection_of_sounds_out_of_a_cluster(
+    #     input_csv_path="database_analysis/CLUSTER_2_VALIDATED_ids.csv",
+    #     output_dir="sounds/clusters_collections",
+    #     root_raw_audio_dir=root_raw_audio_dir,
+    #     extra_padding=0.25)
+
+
+
+    #################################################################################################
+    ###################################### CLUSTER 3 ################################################
+    #################################################################################################
+    #################################################################################################
+    ########### CERCA IN TUTTI I CANDIDATI WHOOP NON NULLI I PIU SIMILI A whooping_collection.wav   ###########
+    #################################################################################################
+    # df = pd.read_csv("database_analysis/whoop_raw_stats.csv")
+    
+    # f0_range = [310, 350] 
+    # duration_range = [0.05, 0.100] 
+    # weighted_shr_min = 0.2 
+    # max_alignments_min = 5
+
+    # print(f"\nTOTALE INIZIALE: {len(df):,} whoop\n")
+
+    # # Statistiche iniziali
+    # print("DISTRIBUZIONI INIZIALI:")
+    # print(f"  F0:              mean={df.f0.mean():.1f}Hz, Q1={df.f0.quantile(0.25):.1f}, Q3={df.f0.quantile(0.75):.1f}")
+    # print(f"  Duration:        mean={df.precise_duration.mean():.3f}s, Q1={df.precise_duration.quantile(0.25):.3f}, Q3={df.precise_duration.quantile(0.75):.3f}")
+    # print(f"  Weighted SHR:    mean={df.weighted_shr.mean():.3f}, Q1={df.weighted_shr.quantile(0.25):.3f}, Q3={df.weighted_shr.quantile(0.75):.3f}")
+    # print(f"  Max alignments:  mean={df.max_alignments.mean():.1f}, Q1={df.max_alignments.quantile(0.25):.0f}, Q3={df.max_alignments.quantile(0.75):.0f}")
+    # print(f"  HNR:             mean={df.hnr.mean():.1f}, Q1={df.hnr.quantile(0.25):.1f}, Q3={df.hnr.quantile(0.75):.1f}")
+    # print("\n" + "="*70)
+    # print("APPLICAZIONE FILTRI (PROGRESSIVA)")
+    # print("="*70)
+
+    # # Copia per filtering progressivo
+    # df_filtered = df.copy()
+
+    # # Filtro 1: F0
+    # mask_f0 = (df_filtered.f0 >= f0_range[0]) & (df_filtered.f0 <= f0_range[1])
+    # df_filtered = df_filtered[mask_f0]
+    # pct = len(df_filtered)/len(df)*100
+    # print(f"\n1️⃣  F0 in [{f0_range[0]}, {f0_range[1]}] Hz")
+    # print(f"    Rimangono: {len(df_filtered):,}/{len(df):,} ({pct:.1f}%)")
+    # print(f"    Scartati:  {len(df) - len(df_filtered):,} ({100-pct:.1f}%)")
+
+    # # Filtro 2: Duration
+    # mask_dur = (df_filtered.precise_duration >= duration_range[0]) & (df_filtered.precise_duration <= duration_range[1])
+    # prev_count = len(df_filtered)
+    # df_filtered = df_filtered[mask_dur]
+    # pct = len(df_filtered)/len(df)*100
+    # print(f"\n2️⃣  Duration in [{duration_range[0]}, {duration_range[1]}] s")
+    # print(f"    Rimangono: {len(df_filtered):,}/{len(df):,} ({pct:.1f}%)")
+    # print(f"    Scartati in questo step: {prev_count - len(df_filtered):,}")
+
+    # # Filtro 3 (raffinato): qualità = SHR alto  max_alignments alto
+    # mask_quality = (
+    #     (df_filtered.weighted_shr >= weighted_shr_min) & 
+    #     (df_filtered.max_alignments >= max_alignments_min)
+    # )
+    # prev_count = len(df_filtered)
+    # df_filtered = df_filtered[mask_quality]
+
+    # pct = len(df_filtered)/len(df)*100
+    # print(f"\n3️⃣  Quality gate: weighted_shr >= {weighted_shr_min:.3f} OR max_alignments >= {max_alignments_min}")
+    # print(f"    Rimangono: {len(df_filtered):,}/{len(df):,} ({pct:.1f}%)")
+    # print(f"    Scartati in questo step: {prev_count - len(df_filtered):,}")
 
 
 
 
+    # print("\n" + "="*70)
+    # print("RISULTATO FINALE")
+    # print("="*70)
+    # print(f"\n✅ WHOOP GOOD: {len(df_filtered):,}/{len(df):,} ({len(df_filtered)/len(df)*100:.1f}%)")
+    # print(f"❌ SCARTATI:   {len(df) - len(df_filtered):,}/{len(df):,} ({(len(df) - len(df_filtered))/len(df)*100:.1f}%)")
+
+    # print("\n" + "="*70)
+    # print("STATISTICHE WHOOP GOOD (dopo filtering)")
+    # print("="*70)
+    # print(f"  F0:              mean={df_filtered.f0.mean():.1f}Hz (range: {df_filtered.f0.min():.0f}-{df_filtered.f0.max():.0f})")
+    # print(f"  Duration:        mean={df_filtered.precise_duration.mean():.3f}s (range: {df_filtered.precise_duration.min():.3f}-{df_filtered.precise_duration.max():.3f})")
+    # print(f"  Weighted SHR:    mean={df_filtered.weighted_shr.mean():.3f} (range: {df_filtered.weighted_shr.min():.3f}-{df_filtered.weighted_shr.max():.3f})")
+    # print(f"  Max alignments:  mean={df_filtered.max_alignments.mean():.1f} (range: {df_filtered.max_alignments.min():.0f}-{df_filtered.max_alignments.max():.0f})")
+    # print(f"  HNR:             mean={df_filtered.hnr.mean():.3f} (range: {df_filtered.hnr.min():.3f}-{df_filtered.hnr.max():.3f})")
+
+    # # save ids of good whoop in a new CSV THE NON VALIDATED ONE
+    # df_filtered[["id"]].to_csv("database_analysis/CLUSTER_3_ids.csv", index=False)
 
 
+    # # analizza tutti i whoop del cluster 2 per validarli manualmente e mettere in un nuovo CSV quelli validati come buoni (da ascoltare e verificare uno ad uno) 
+    # database_analyzer.validate_cluster(
+    #     input_csv_path="database_analysis/CLUSTER_3_ids.csv",
+    #     output_csv_path="database_analysis/CLUSTER_3_VALIDATED_ids.csv",
+    #     root_raw_audio_dir=root_raw_audio_dir
+    # )
+
+    # database_analyzer.extract_statistics_from_cluster(
+    #     input_csv_path="database_analysis/CLUSTER_3_VALIDATED_ids.csv")
+    
+    # database_analyzer.make_collection_of_sounds_out_of_a_cluster(
+    #     input_csv_path="database_analysis/CLUSTER_3_VALIDATED_ids.csv",
+    #     output_dir="sounds/clusters_collections",
+    #     root_raw_audio_dir=root_raw_audio_dir,
+    #     extra_padding=0.5)
 
 
     # ###########################################################################################################
@@ -621,5 +711,6 @@ if __name__ == "__main__":
     # database_analyzer.plot_spectrogram_from_db(filename_whoop_test, sr=data['sr']) 
     
 
+    data = database_analyzer.load_whoop_by_id("audio_recording_2025-09-18T14_17_47.924832Z_ch_16_peaktime_55.875_windowstart_55.625_windowend_56.125_hnrvalue_4.16", verbose=True)
 
 
