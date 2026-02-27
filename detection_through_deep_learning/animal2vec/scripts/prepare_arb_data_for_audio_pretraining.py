@@ -107,8 +107,6 @@ def get_parser():
 
 
 def iteration(file, args, id_generator, labels, channel_dict):
-    # Then we load the dataframe that was created using the "raw_labels_to_dataframe.py" script
-    # Create dictionary
     random_names_dictionary = {}
     out_folder = os.path.join(args.output_folder, "{}_{:02.0f}s_{}".format(
         args.base_name, args.segment_length, datetime.today().strftime('%Y-%m-%d')))
@@ -118,6 +116,7 @@ def iteration(file, args, id_generator, labels, channel_dict):
     prev_audio_filename = ""
     audio_filename = str(file)
     base_file_name = os.path.basename(audio_filename)
+
     if os.path.isfile(args.pickle_file) and labels is not None:
         if (base_file_name not in args.audio_file_list_from_pickle) and args.use_only_files_with_labels:
             return total_duration, c_, random_names_dictionary
@@ -139,127 +138,136 @@ def iteration(file, args, id_generator, labels, channel_dict):
         print("{} is corrupt and has a length of zero. We skip it.".format(audio_filename), flush=True)
         return total_duration, c_, random_names_dictionary
 
-    if waveform.ndim == 2:  # Stereo file
-        if channel_dict is not None:
-            arg_channel_dict = [x[:-4] in os.path.basename(audio_filename).lower() for x in channel_dict]
-            if any(arg_channel_dict):
-                arg_channel_dict_keys = list(channel_dict.keys())[np.argwhere(arg_channel_dict).squeeze()]
-                waveform = waveform[:, channel_dict[arg_channel_dict_keys]].squeeze()
+    # ===== MODIFICA 1: estrazione multicanale =====
+    # Originale: selezionava un singolo canale (0 di default o da channel_dict)
+    # e scartava tutti gli altri. Ora estraiamo tutti i canali in memoria
+    # come lista di array mono, senza scrivere file temporanei su disco.
+    if waveform.ndim == 1:
+        # File già mono: lista con un solo elemento
+        channels = [waveform]
+        channel_ids = [0]
+    else:
+        # File multicanale: estrai ogni canale come array 1D separato
+        channels = [waveform[:, i] for i in range(waveform.shape[1])]
+        channel_ids = list(range(waveform.shape[1]))
+    # ===== FINE MODIFICA 1 =====
+
+    # ===== MODIFICA 2: resample_cond semplificato =====
+    # Originale: resample_cond = metadata.samplerate != args.resample_rate or metadata.channels != 1
+    # La condizione "metadata.channels != 1" forzava il resample su qualsiasi file
+    # multicanale anche se la frequenza era già corretta. Ora gestiamo i canali
+    # manualmente, quindi il resample dipende solo dalla frequenza.
+    resample_cond = metadata.samplerate != args.resample_rate
+    # ===== FINE MODIFICA 2 =====
+
+    # ===== MODIFICA 3: loop su canali =====
+    # Originale: il blocco di segmentazione girava una volta sola su waveform mono.
+    # Ora iteriamo su ogni canale estratto, producendo segmenti e label
+    # identici per ciascuno. Le label temporali si applicano a tutti i canali
+    # in egual misura (un evento whooping avviene nello stesso istante su tutti i mic).
+    for ch_idx, channel_waveform in zip(channel_ids, channels):
+
+        segments = np.arange(0, len(channel_waveform), args.segment_length * sample_rate).astype(int)
+        pargs = (base_file_name, ch_idx, len(segments) - 1)
+        print("File {} ch{:02d} has {} segments".format(*pargs))
+
+        for low, high in tqdm(zip(segments[:-1], segments[1:]), leave=False):
+            wave_snippet = channel_waveform[low:high]
+            from_sec, to_sec = low / sample_rate, high / sample_rate
+
+            if os.path.isfile(args.pickle_file):
+                from_sec_td, to_sec_td = timedelta(seconds=from_sec), timedelta(seconds=to_sec)
+
+            if resample_cond:
+                wave_snippet = librosa.resample(wave_snippet,
+                                orig_sr=sample_rate,
+                                target_sr=args.resample_rate,
+                                res_type="soxr_hq")  # era "kaiser_best"
+
+            # ===== MODIFICA 4: suffisso canale nel nome file =====
+            # Originale: "{}_{:05.0f}s_{:05.0f}s".format(...)
+            # Aggiunto _ch{:02d} per distinguere i segmenti dello stesso
+            # intervallo temporale provenienti da canali diversi.
+            f_name_base = "{}_{:05.0f}s_{:05.0f}s_ch{:02d}".format(
+                os.path.basename(audio_filename)[:-4], from_sec, to_sec, ch_idx)
+            # ===== FINE MODIFICA 4 =====
+
+            if args.randomize_file_names:
+                out_folders_list = [str(i) for i in range(args.num_subfolders)] if args.num_subfolders else [""]
+                base_out_filename = random.choice(out_folders_list)
+                _new_rand_name = id_generator()
+                if os.path.join(base_out_filename, _new_rand_name) in random_names_dictionary:
+                    while os.path.join(base_out_filename, _new_rand_name) in random_names_dictionary:
+                        _new_rand_name = id_generator()
+                random_names_dictionary.update({os.path.join(base_out_filename, _new_rand_name): f_name_base})
+                f_name_base = _new_rand_name
             else:
-                if audio_filename[:-18] != prev_audio_filename:
-                    print(os.path.basename(audio_filename).lower()[:-18],
-                          " has no entry in overview file but is stereo, choosing 0")
-                    prev_audio_filename = audio_filename[:-18]
-                waveform = waveform[:, 0].squeeze()  # Use the first channel if no ext info is avail.
-        else:
-            waveform = waveform[:, 0].squeeze()
+                base_out_filename = os.path.dirname(audio_filename).replace(os.sep, "_").replace("-", "_").lower()
+                if base_out_filename.startswith("_"):
+                    base_out_filename = base_out_filename[1:]
+                base_out_filename = base_out_filename[len(args.input_folder):]
 
-    resample_cond = metadata.samplerate != args.resample_rate or metadata.channels != 1
+            out_folder_wav = os.path.join(out_folder, "wav", "{:05.0f}Hz".format(args.resample_rate),
+                                          base_out_filename)
+            out_folder_lbl = os.path.join(out_folder, "lbl", "{:05.0f}Hz".format(args.resample_rate),
+                                          base_out_filename)
+            f_name_wav = f_name_base + ".wav"
 
-    # Split the file
-    # TODO: When max(waveform.shape) == segment_length_sec * sample_rate nothing happens
-    segments = np.arange(0, max(waveform.shape), args.segment_length * sample_rate).astype(int)
-    pargs = (base_file_name, len(segments) - 1)
-    print("File {} has {} segments".format(*pargs))
-    for low, high in tqdm(zip(segments[:-1], segments[1:]), leave=False):
-        wave_snippet = waveform[low:high]
-        # print("\nWave snippet", wave_snippet.shape)
-        from_sec, to_sec = low / sample_rate, high / sample_rate
+            if not os.path.isdir(out_folder_wav):
+                os.makedirs(out_folder_wav, exist_ok=True)
 
-        if os.path.isfile(args.pickle_file):
-            # convert to timedeltas for label checking
-            from_sec_td, to_sec_td = timedelta(seconds=from_sec), timedelta(seconds=to_sec)
+            if os.path.isfile(os.path.join(out_folder_wav, f_name_wav)):
+                print("The file {} already exists, skipping rewriting it".format(f_name_wav))
+                continue
 
-        if resample_cond:  # Resample if needed
-            wave_snippet = librosa.resample(wave_snippet,
-                                            orig_sr=sample_rate,
-                                            target_sr=args.resample_rate,
-                                            res_type="kaiser_best")
+            try:
+                sf.write(os.path.join(out_folder_wav, f_name_wav),
+                         wave_snippet, args.resample_rate,
+                         format="WAV",
+                         subtype="PCM_16")
+            except sf.LibsndfileError as e:
+                print("{} cannot be written out and raised a LibsndfileError. We skip it.".format(audio_filename),
+                      flush=True)
+                print(e, flush=True)
+                continue
 
-        f_name_base = "{}_{:05.0f}s_{:05.0f}s".format(os.path.basename(audio_filename)[:-4],
-                                                      from_sec, to_sec)
-        if args.randomize_file_names:
-            out_folders_list = [str(i) for i in range(args.num_subfolders)] if args.num_subfolders else [""]
-            base_out_filename = random.choice(out_folders_list)
-            _new_rand_name = id_generator()
-            if os.path.join(base_out_filename, _new_rand_name) in random_names_dictionary:
-                while os.path.join(base_out_filename, _new_rand_name) in random_names_dictionary:  # Create a new name until it is unique
-                    _new_rand_name = id_generator()
-            random_names_dictionary.update({os.path.join(base_out_filename, _new_rand_name): f_name_base})
-            f_name_base = _new_rand_name
-        
-        else:
-            # Prepare the base filename for output
-            # if files were structured in multiple nested folders, then encode
-            # this into the new filename starting from the base input folder
-            base_out_filename = os.path.dirname(audio_filename).replace(os.sep, "_").replace("-", "_").lower()
-            if base_out_filename.startswith("_"):
-                base_out_filename = base_out_filename[1:]
-            # TODO: input_path is a list ... len is always 1, or 2, or so
-            base_out_filename = base_out_filename[len(args.input_folder):]
-            
-        out_folder_wav = os.path.join(out_folder, "wav", "{:05.0f}Hz".format(args.resample_rate),
-                                        base_out_filename)
-        out_folder_lbl = os.path.join(out_folder, "lbl", "{:05.0f}Hz".format(args.resample_rate),
-                                        base_out_filename)
-        f_name_wav = f_name_base + ".wav"
+            if not os.path.isfile(os.path.join(out_folder_wav, f_name_wav)):
+                print("The file {} was not written to {}".format(f_name_wav, out_folder_wav))
 
-        if not os.path.isdir(out_folder_wav):
-            os.makedirs(out_folder_wav)
+            # Label handling — invariato rispetto all'originale.
+            # Le stesse label temporali vengono replicate su tutti i canali.
+            start_time_lbl, start_frame_lbl, end_time_lbl, end_frame_lbl, lbl, lbl_cat, foc = [], [], [], [], [], [], []
+            if os.path.isfile(args.pickle_file) and labels is not None:
+                for lbl_i, (s, e) in enumerate(zip(starts, ends)):
+                    if s < from_sec_td < e or s < to_sec_td < e or from_sec_td < s < e < to_sec_td:
+                        start_time = (s - from_sec_td).total_seconds()
+                        start_time_lbl.append(max(start_time, 0.))
+                        start_frame_lbl.append(
+                            np.floor(start_time_lbl[-1] * args.resample_rate).astype(int) if start_time > 0 else 0)
+                        end_time = (e - from_sec_td).total_seconds()
+                        end_time_lbl.append(min(end_time, float(args.segment_length)))
+                        end_frame_lbl.append(np.ceil(end_time_lbl[-1] * args.resample_rate).astype(int))
+                        lbl.append(file_labels.iloc[lbl_i])
+                        foc.append(1 if file_focal_labels.iloc[lbl_i].lower() == "focal" else 0)
+                        lbl_cat.append(args.unique_labels.index(lbl[-1]))
+                        total_duration.append(end_time_lbl[-1] - start_time_lbl[-1])
 
-        if os.path.isfile(os.path.join(out_folder_wav, f_name_wav)):  # Avoid creating files that already exist
-            print("The file {} already exists, skipping rewriting it".format(f_name_wav))
-            continue
+            if not os.path.isdir(out_folder_lbl):
+                os.makedirs(out_folder_lbl, exist_ok=True)
 
-        # Write out wav file
-        try:
-            sf.write(os.path.join(out_folder_wav, f_name_wav),
-                     wave_snippet, args.resample_rate,
-                     format="WAV",
-                     subtype="PCM_16")
-        except sf.LibsndfileError as e:
-            print("{} cannot be written out and raised a LibsndfileError. We skip it.".format(audio_filename),
-                  flush=True)
-            print(e, flush=True)
-            continue
+            f_name_lbl = f_name_base + ".h5"
+            with h5py.File(os.path.join(out_folder_lbl, f_name_lbl), mode="w") as f:
+                f.create_dataset(name="start_time_lbl", data=start_time_lbl)
+                f.create_dataset(name="start_frame_lbl", data=start_frame_lbl)
+                f.create_dataset(name="end_time_lbl", data=end_time_lbl)
+                f.create_dataset(name="end_frame_lbl", data=end_frame_lbl)
+                f.create_dataset(name="lbl", data=lbl)
+                f.create_dataset(name="lbl_cat", data=lbl_cat)
+                f.create_dataset(name="foc", data=foc)
+    # ===== FINE MODIFICA 3 =====
 
-        if not os.path.isfile(os.path.join(out_folder_wav, f_name_wav)):  # Check that writing was succesful
-            print("The file {} was not written to {}".format(f_name_wav, out_folder_wav))
-
-        # Check for labels
-        start_time_lbl, start_frame_lbl, end_time_lbl, end_frame_lbl, lbl, lbl_cat, foc = [], [], [], [], [], [], []
-        if os.path.isfile(args.pickle_file) and labels is not None:
-            for lbl_i, (s, e) in enumerate(zip(starts, ends)):
-                # If a label is fully or partial in the time interval
-                if s < from_sec_td < e or s < to_sec_td < e or from_sec_td < s < e < to_sec_td:
-                    start_time = (s - from_sec_td).total_seconds()
-                    start_time_lbl.append(max(start_time, 0.))
-                    start_frame_lbl.append(
-                        np.floor(start_time_lbl[-1] * args.resample_rate).astype(int) if start_time > 0 else 0)
-
-                    end_time = (e - from_sec_td).total_seconds()
-                    end_time_lbl.append(min(end_time, float(args.segment_length)))
-                    end_frame_lbl.append(np.ceil(end_time_lbl[-1] * args.resample_rate).astype(int))
-
-                    lbl.append(file_labels.iloc[lbl_i])
-                    foc.append(1 if file_focal_labels.iloc[lbl_i].lower() == "focal" else 0)
-
-                    lbl_cat.append(args.unique_labels.index(lbl[-1]))
-                    total_duration.append(end_time_lbl[-1] - start_time_lbl[-1])
-
-        if not os.path.isdir(out_folder_lbl):
-            os.makedirs(out_folder_lbl)
-
-        f_name_lbl = f_name_base + ".h5"
-        with h5py.File(os.path.join(out_folder_lbl, f_name_lbl), mode="w") as f:
-            f.create_dataset(name="start_time_lbl", data=start_time_lbl)
-            f.create_dataset(name="start_frame_lbl", data=start_frame_lbl)
-            f.create_dataset(name="end_time_lbl", data=end_time_lbl)
-            f.create_dataset(name="end_frame_lbl", data=end_frame_lbl)
-            f.create_dataset(name="lbl", data=lbl)
-            f.create_dataset(name="lbl_cat", data=lbl_cat)
-            f.create_dataset(name="foc", data=foc)
     return total_duration, c_, random_names_dictionary
+
 
 
 def main(args):

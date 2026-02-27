@@ -2,6 +2,7 @@
 
 common:
   fp16: true
+  # fp16: false  # possibile modifica: disabilitare se cuFFT ha problemi con tensori in half precision (es. RTX consumer)
   log_format: json
   log_interval: 384  # log every tenth of an epoch
   tensorboard_logdir: tb
@@ -16,6 +17,7 @@ checkpoint:
 task:
   _name: audio_ccas
   data: /path/to/manifest_files
+  # data: "/path/to/your/manifest"  # possibile modifica: sostituire con il path reale al manifest
   unique_labels: "['beep', 'synch', 'sn', 'cc', 'ld', 'oth', 'mo', 'al', 'soc', 'agg', 'eating', 'focal']"
   # Change feature extractor for MeerKAT
   # 8000Hz / 5 / 2 / 2 / 2 / 1 / 1 / 1 -> Effective encoder output frequency of 200Hz.
@@ -31,9 +33,11 @@ task:
 
 dataset:
   num_workers: 32
+  # num_workers: 8  # possibile modifica: ridurre in base ai core CPU disponibili
   # max_tokens / sample_rate * distributed_world_size * update_freq is the batch size in seconds
   # For training on asmodeus, we use 960s for training, as in the paper
-  max_tokens: 408_000  #  a token is a single audio frame
+  max_tokens: 408_000  # a token is a single audio frame
+  # max_tokens: 80_000  # possibile modifica: ridurre per GPU con meno VRAM
   skip_invalid_size_inputs_valid_test: true
   validate_interval: 25
   validate_interval_updates: 10000  # validate every m updates
@@ -41,9 +45,11 @@ dataset:
   disable_validation: true
   train_subset: pretrain
   valid_subset: valid_0
+  # valid_subset: pretrain  # possibile modifica: usare pretrain come dummy validation se non si ha un split dedicato
 
 distributed_training:
   distributed_world_size: 4  # Number of GPUs
+  # distributed_world_size: 1  # possibile modifica: single GPU
   ddp_backend: legacy_ddp
 
 criterion:
@@ -60,7 +66,9 @@ criterion:
 
 optimization:
   update_freq: [ 5 ]  # Gradient accumulation steps
+  # update_freq: [ 15 ]  # possibile modifica: aumentare per simulare batch più grandi con meno VRAM
   max_update: 384230  # 3842.3 updates are one epoch, so we train for 100 epochs
+  # max_update: 176640  # possibile modifica: 50 epoche
   clip_norm: 1
 
 optimizer:
@@ -77,6 +85,7 @@ optimizer:
       lr_scheduler:
         _name: cosine
         warmup_updates: 10000
+        # warmup_updates: 1000  # possibile modifica: ridurre per dataset piccoli o training breve
 
 lr_scheduler: pass_through
 
@@ -90,6 +99,7 @@ model:
   num_heads: 16
 
   clone_batch: 12
+  # clone_batch: 4  # possibile modifica: ridurre per GPU con meno VRAM
 
   ema_decay: 0.9997
   ema_end_decay: 1
