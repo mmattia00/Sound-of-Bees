@@ -486,6 +486,8 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
         elif mode == "A_weighting":
             w = torch.hann_window(n_fft, device=sound.device) * sound
             spec = torch.fft.rfft(w)
+            # spec = torch.fft.rfft(w.cpu().float()).to(sound.device)  #################################### FIX MINIMALE PER FAR FUNZIONARE PRETRAIN SU MIO LAPTOP
+
             power_spec = spec.abs() ** 2
             a_weighted_spec = power_spec * self.a_weight[fs]
             g = a_weighted_spec.sum(-1)
