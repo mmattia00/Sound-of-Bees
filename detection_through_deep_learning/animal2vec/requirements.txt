@@ -14,7 +14,9 @@ pyarrow==15.0.2
 scikit_learn==1.2.0
 scipy==1.10.0
 seaborn==0.13.2
-scikit-image==0.22.0
+# scikit-image==0.22.0
+scikit-image==0.21.0 # animal2vec ha bisogno di python tra 3.6 e 3.9, quindi per generare il docker ho messa nel docker file di partire da come immagine di base nvcr.io/nvidia/pytorch:22.08-py3 che ha python 3.8.13. Il problema è che scikit-images 0.22.0 si aspetta python maggiore o uguale a 3.9 quindi cambio il file requirement.txt
+
 soundfile==0.12.1
 tensorflow==2.11.0
 timm==0.6.12

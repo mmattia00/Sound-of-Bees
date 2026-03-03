@@ -171,7 +171,7 @@ def iteration(file, args, id_generator, labels, channel_dict):
         pargs = (base_file_name, ch_idx, len(segments) - 1)
         print("File {} ch{:02d} has {} segments".format(*pargs))
 
-        for low, high in tqdm(zip(segments[:-1], segments[1:]), leave=False):
+        for low, high in zip(segments[:-1], segments[1:]):
             wave_snippet = channel_waveform[low:high]
             from_sec, to_sec = low / sample_rate, high / sample_rate
 

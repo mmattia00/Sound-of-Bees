@@ -1,0 +1,10 @@
+data/
+*.wav
+*.flac
+*.mp3
+*.pt
+*.h5
+*.hdf5
+__pycache__/
+*.pyc
+.git/
