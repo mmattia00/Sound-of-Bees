@@ -2,9 +2,6 @@ FROM nvcr.io/nvidia/pytorch:22.08-py3
 
 WORKDIR /workspace/animal2vec
 
-# Copia i file del repo nell'immagine
-COPY . .
-
 # Versione pip richiesta da animal2vec
 RUN pip install --upgrade pip==24.0
 
@@ -23,3 +20,7 @@ RUN pip install tqdm==4.64.1
 
 # Necessario per "import nn" che animal2vec usa internamente
 ENV PYTHONPATH="/workspace/animal2vec:"
+
+
+# Copia i file del repo nell'immagine
+COPY . .
