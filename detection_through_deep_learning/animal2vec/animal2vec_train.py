@@ -7,7 +7,7 @@
 import os
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-import hydra
+import hydra # sistema per leggere file config.yaml
 import torch
 import logging
 
