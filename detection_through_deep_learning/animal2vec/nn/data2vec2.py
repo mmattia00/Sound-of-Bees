@@ -347,8 +347,8 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
         ema_config = EMAModuleConfig(
             ema_decay=ema_decay,
             ema_fp32=True,
-            # log_norms=self.cfg.log_norms,
-            add_missing_params=False,
+            # log_norms=self.cfg.log_norms, # both parameters not present in the version of fairseq I put in the container
+            # add_missing_params=False,
         )
 
         model_copy = self.make_target_model()
