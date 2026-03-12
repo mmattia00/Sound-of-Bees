@@ -356,7 +356,7 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
         return EMAModule(
             model_copy,
             ema_config,
-            copy_model=False,
+            # copy_model=False, # parameter not present in the version of fairseq I put in the container
         )
 
     def make_target_model(self):
