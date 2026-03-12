@@ -37,7 +37,8 @@ dataset:
   required_batch_size_multiple: 1
   disable_validation: true
   train_subset: pretrain
-  valid_subset: valid_0
+  # valid_subset: valid_0
+  valid_subset: pretrain
 
 distributed_training:
   distributed_world_size: 1
