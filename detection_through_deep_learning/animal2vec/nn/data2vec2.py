@@ -347,7 +347,7 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
         ema_config = EMAModuleConfig(
             ema_decay=ema_decay,
             ema_fp32=True,
-            log_norms=self.cfg.log_norms,
+            # log_norms=self.cfg.log_norms,
             add_missing_params=False,
         )
 
