@@ -13,6 +13,7 @@ common:
 checkpoint:
   save_interval: 1
   keep_last_epochs: 5
+  save_dir: /abyss/home/checkpoints/bee-pretrain-test   # ← persistente su CephFS
 
 task:
   _name: audio_ccas
