@@ -4,8 +4,7 @@ common:
   fp16: true
   log_format: json
   log_interval: 50
-  # tensorboard_logdir: tb # effimero
-  tensorboard_logdir: /abyss/home/tb_logs/bee-pretrain-test # persistente
+  tensorboard_logdir: /abyss/home/tb_logs/bee-pretrain-test
   min_loss_scale: 1e-6
   fp16_no_flatten_grads: true
   fp16_init_scale: 1
@@ -13,11 +12,11 @@ common:
 checkpoint:
   save_interval: 1
   keep_last_epochs: 5
-  save_dir: /abyss/home/checkpoints/bee-pretrain-test   # ← persistente su CephFS
+  save_dir: /abyss/home/checkpoints/bee-pretrain-test
 
 task:
   _name: audio_ccas
-  data: /abyss/home/dataset_preprocessed/SoundOfBees_10s_2026-03-05/manifest
+  data: /local/SoundOfBees_10s_half/manifest   # ← MODIFICATO: da CephFS a fast storage locale
   unique_labels: "[]"
   conv_feature_layers: '[(127, 63, 1)] +[(512, 10, 5)] + [(512, 3, 4)] + [(512, 3, 3)] + [(512, 3, 2)] + [(512, 3, 1)] + [(512, 2, 1)] * 2'
   min_sample_size: 1
@@ -29,19 +28,18 @@ task:
   enable_padding: false
 
 dataset:
-  num_workers: 4 # using 4 cpu
-  max_tokens: 480000 # 2 clip (240000 per clip) 
+  num_workers: 59                              # ← MODIFICATO: da 4 a 59 (sfrutta i CPU disponibili)
+  max_tokens: 960000                           # ← MODIFICATO: da 480000 a 960000 (batch più grande con A100-40GB)
   skip_invalid_size_inputs_valid_test: true
   validate_interval: 25
   validate_interval_updates: 10000
   required_batch_size_multiple: 1
   disable_validation: true
   train_subset: pretrain
-  # valid_subset: valid_0
   valid_subset: pretrain
 
 distributed_training:
-  distributed_world_size: 1
+  distributed_world_size: 4                   # ← MODIFICATO: da 1 a 4 (usa tutte e 4 le GPU)
   ddp_backend: legacy_ddp
 
 criterion:
@@ -57,20 +55,20 @@ criterion:
     - masked_pct
 
 optimization:
-  lr: [0.00025]              # ← AGGIUNTO
+  lr: [0.00025]
   update_freq: [2]
-  max_update: 14175
+  max_update: 22782                            # ← MODIFICATO: da 14175 a 22782 (1 epoca esatta su 729024 file)
   clip_norm: 1
 
-optimizer:                   # ← MODIFICATO: rimosso composite/dynamic_groups, sostituito con adam diretto
+optimizer:
   _name: adam
   adam_betas: [0.9, 0.98]
   adam_eps: 1e-06
   weight_decay: 0.01
 
-lr_scheduler:                # ← MODIFICATO: era pass_through, ora cosine
+lr_scheduler:
   _name: cosine
-  warmup_updates: 500
+  warmup_updates: 450                          # ← MODIFICATO: da 500 a 450 (proporzionale al nuovo max_update)
 
 model:
   _name: data2vec_multi
