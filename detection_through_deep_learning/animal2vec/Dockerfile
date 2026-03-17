@@ -21,6 +21,7 @@ RUN pip install -r requirements.txt
 RUN pip install --no-build-isolation \
     git+https://github.com/facebookresearch/fairseq.git@920a548ca770fb1a951f7f4289b4d3a0c1bc226f
 
+# maybe not necessary
 RUN pip install tqdm==4.64.1
 
 ENV PYTHONPATH="/workspace/animal2vec:"
