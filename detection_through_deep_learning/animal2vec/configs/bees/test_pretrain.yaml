@@ -39,7 +39,7 @@ dataset:
   valid_subset: pretrain
 
 distributed_training:
-  distributed_world_size: 4                   # ← MODIFICATO: da 1 a 4 (usa tutte e 4 le GPU)
+  distributed_world_size: 2                   # ← MODIFICATO: da 1 a 4 (usa tutte e 4 le GPU)
   ddp_backend: legacy_ddp
 
 criterion:
