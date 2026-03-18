@@ -194,12 +194,12 @@ export TORCH_HOME=/abyss/home/mattia-montanari/.cache/torch
 export TMPDIR=/abyss/home/mattia-montanari/tmp
 
 mkdir -p "$TMPDIR"
-mkdir -p /abyss/home/checkpoints/bee-pretrain-test
-mkdir -p /abyss/home/tb_logs/bee-pretrain-test
+mkdir -p /abyss/home/checkpoints/bee-pretrain-tiamat-2gpu
+mkdir -p /abyss/home/tb_logs/bee-pretrain-tiamat-2gpu
 
 echo "[INFO] Avvio training con config: $CONFIG_DIR/test_pretrain"
-echo "[INFO] Checkpoints -> /abyss/home/checkpoints/bee-pretrain-test"
-echo "[INFO] TensorBoard -> /abyss/home/tb_logs/bee-pretrain-test"
+echo "[INFO] Checkpoints -> /abyss/home/checkpoints/bee-pretrain-tiamat-2gpu"
+echo "[INFO] TensorBoard -> /abyss/home/tb_logs/bee-pretrain-tiamat-2gpu"
 echo "[INFO] Timestamp avvio: $(date)"
 
 python "$TRAIN_SCRIPT" \

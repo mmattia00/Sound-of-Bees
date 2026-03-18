@@ -1,0 +1,127 @@
+# @package _group_
+
+common:
+  fp16: true
+  log_format: json
+  log_interval: 50
+  tensorboard_logdir: /abyss/home/tb_logs/bee-pretrain-vecna-4gpu
+  min_loss_scale: 1e-6
+  fp16_no_flatten_grads: true
+  fp16_init_scale: 1
+
+checkpoint:
+  save_interval: 1
+  keep_last_epochs: 5
+  save_dir: /abyss/home/checkpoints/bee-pretrain-vecna-4gpu
+
+task:
+  _name: audio_ccas
+  data: /local/SoundOfBees_10s_half/manifest
+  unique_labels: "[]"
+  conv_feature_layers: '[(127, 63, 1)] +[(512, 10, 5)] + [(512, 3, 4)] + [(512, 3, 3)] + [(512, 3, 2)] + [(512, 3, 1)] + [(512, 2, 1)] * 2'
+  min_sample_size: 1
+  sample_rate: 24000
+  normalize: true
+  with_labels: false
+  min_label_size: 1
+  verbose_tensorboard_logging: false
+  enable_padding: false
+
+dataset:
+  num_workers: 59
+  max_tokens: 960000        # ← TIENI invariato: V100 32GB con fp16 regge (se OOM abbassa a 800000)
+  skip_invalid_size_inputs_valid_test: true
+  validate_interval: 25
+  validate_interval_updates: 10000
+  required_batch_size_multiple: 1
+  disable_validation: true
+  train_subset: pretrain
+  valid_subset: pretrain
+
+distributed_training:
+  distributed_world_size: 4           # ← 2 → 4
+  nprocs_per_node: 4                  # ← aggiunto
+  ddp_backend: legacy_ddp
+
+criterion:
+  _name: expanded_model
+  segmentation_metrics: true
+  use_focal_loss: true
+  log_keys:
+    - ema_decay
+    - target_var
+    - pred_var
+    - model_norm
+    - ema_norm
+    - masked_pct
+
+optimization:
+  lr: [0.00025]
+  update_freq: [2]
+  max_update: 11391                   # ← 22782 → 11391: con 4 GPU l'epoca è dimezzata
+  clip_norm: 1
+
+optimizer:
+  _name: adam
+  adam_betas: [0.9, 0.98]
+  adam_eps: 1e-06
+  weight_decay: 0.01
+
+lr_scheduler:
+  _name: cosine
+  warmup_updates: 225                 # ← 450 → 225: proporzionale al nuovo max_update (~2%)
+  max_update: 11391
+
+model:
+  _name: data2vec_multi
+  loss_beta: 0
+  loss_scale: null
+  depth: 12
+  embed_dim: 768
+  clone_batch: 8
+  ema_decay: 0.9997
+  ema_end_decay: 1
+  ema_anneal_end_step: 300000
+  ema_encoder_only: false
+  average_top_k_layers: 12
+  instance_norm_target_layer: true
+  layer_norm_target_layer: false
+  layer_norm_targets: false
+  layerdrop: 0
+  norm_eps: 1e-5
+  supported_modality: AUDIO
+  target_mixup: false
+  source_mixup: 0.5
+  mixup_prob: 1.0
+  same_mixup: true
+  mixing_window_length: 0.05
+  gain_mode: "A_weighting"
+  modalities:
+    audio:
+      sinc_input: true
+      apply_window_to_root: false
+      use_pswish: true
+      sinc_norm: "layer_norm"
+      conv_pos_depth: 5
+      conv_pos_width: 95
+      conv_pos_groups: 16
+      prenet_depth: 0
+      mask_prob: 1.5
+      mask_length: 2
+      mask_prob_adjust: 0.05
+      inverse_mask: false
+      mask_noise_std: 0.01
+      mask_dropout: 0
+      add_masks: false
+      ema_local_encoder: false
+      use_alibi_encoder: true
+      prenet_layerdrop: 0.05
+      prenet_dropout: 0.1
+      learned_alibi_scale: true
+      learned_alibi_scale_per_head: true
+      decoder:
+        input_dropout: 0.1
+        decoder_dim: 384
+        decoder_groups: 16
+        decoder_kernel: 7
+        decoder_layers: 4
