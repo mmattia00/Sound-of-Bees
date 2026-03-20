@@ -1,29 +1,36 @@
 import os
 import soundfile as sf
 
-def split_multichannel_audio(input_path, output_folder):
-    # Legge l'audio multicanale
+
+def export_channels(input_path, output_folder, channels):
+    """
+    input_path    : path al file wav multicanale
+    output_folder : cartella di output
+    channels      : lista di indici canale 0-based (es. [0, 8, 15])
+    """
     data, samplerate = sf.read(input_path)
 
-    # Verifica che l'audio abbia 32 canali
-    if data.ndim < 2 or data.shape[1] != 32:
-        raise ValueError("L'audio non ha 32 canali")
+    if data.ndim < 2:
+        raise ValueError("Il file audio è mono, nessun canale da estrarre")
 
-    # Crea la cartella di output se non esiste
     os.makedirs(output_folder, exist_ok=True)
 
-    # Esporta ogni canale come file WAV separato
-    for i in range(32):
-        out_path = os.path.join(output_folder, f"track_{i+1}.wav")
-        sf.write(out_path, data[:, i], samplerate)
+    base_name = os.path.splitext(os.path.basename(input_path))[0]
 
-    return f"Esportate 32 tracce in {output_folder}"
+    for ch in channels:
+        if ch >= data.shape[1]:
+            print(f"Canale {ch} non esiste (il file ha {data.shape[1]} canali), skip")
+            continue
+        out_path = os.path.join(output_folder, f"{base_name}_ch_{ch:02d}.wav")
+        sf.write(out_path, data[:, ch], samplerate)
+        print(f"Esportato: {out_path}")
+
 
 if __name__ == "__main__":
-    audio_name = "audio_recording_2025-09-15T13_57_49.409772Z.wav"
-    base_input_folder = "D:/soundofbees"
-    input_audio_path = os.path.join(base_input_folder, audio_name)
-    output_dir = f"C:/Users/ACE71542GR175/Desktop/TESI/Sound-of-Bees/significative_parts/{audio_name}"  # Cartella di output per le tracce separate
+    input_base_folder = "E:/soundofbees"
+    input_audio_name = "audio_recording_2025-09-15T16_12_49.177436Z.wav"
+    input_audio_path = os.path.join(input_base_folder, input_audio_name)
+    output_dir = "E:/training_dataset_finetuning_raw"
+    channels_to_export = [19, 13, 12, ]  # indici 0-based
 
-    result = split_multichannel_audio(input_audio_path, output_dir)
-    print(result)
+    export_channels(input_audio_path, output_dir, channels_to_export)
