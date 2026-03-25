@@ -4,15 +4,15 @@ common:
   fp16: true
   log_format: json
   log_interval: 50
-  tensorboard_logdir: /abyss/home/tb_logs/bee-pretrain-vecna-4gpu
+  tensorboard_logdir: /abyss/home/tb_logs/bee-pretrain-vecna-4gpu #tb
   min_loss_scale: 1e-6
   fp16_no_flatten_grads: true
   fp16_init_scale: 1
 
 checkpoint:
-  save_interval: 1
+  save_interval: 10
   keep_last_epochs: 5
-  save_dir: /abyss/home/checkpoints/bee-pretrain-vecna-4gpu
+  save_dir: /abyss/home/checkpoints/bee-pretrain-vecna-4gpu 
 
 task:
   _name: audio_ccas
