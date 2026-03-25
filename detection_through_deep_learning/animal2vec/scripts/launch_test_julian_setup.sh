@@ -14,6 +14,11 @@ python3 -m pip install --upgrade pip==24.0 setuptools==69.5.1 wheel==0.40.0
 cd /abyss/home/ml/audio
 rm -rf build
 USE_FFMPEG=1 python setup.py develop
+
+# Aggiungi questo blocco per fairseq
+cd /abyss/home/ml/fairseq
+pip install -e .
+
 # change directory to animal2vec repo
 # animal2vec repo - sostituisci /path/to/code con:
 CODE=/abyss/home/Sound-of-Bees/detection_through_deep_learning/animal2vec
