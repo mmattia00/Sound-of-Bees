@@ -15,7 +15,7 @@ checkpoint:
 
 task:
   _name: audio_ccas
-  data: /local/SoundOfBees_10s/manifest
+  data: /local/SoundOfBees_10s_half/manifest
   unique_labels: "[]"
   # Change feature extractor to account for reduced sample rate in meerkat data
   # 24000Hz / 5 / 2 / 2 / 2 / 1 / 1 / 1 -> Effective encoder output frequency of 200Hz.
