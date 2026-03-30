@@ -32,7 +32,7 @@ dataset:
   num_workers: 60
   # max_tokens / sample_rate * distributed_world_size * update_freq is the batch size in seconds
   # For training on asmodeus, we use ~1000s for training, as in the paper
-  max_tokens: 3000000  #  a token is a single audio frame, one epoch has 7290 steps (~2025h of audio)
+  max_tokens: 1500000  #  a token is a single audio frame, one epoch has 7290 steps (~2025h of audio)
   skip_invalid_size_inputs_valid_test: true
   validate_interval: 25
   validate_interval_updates: 10000  # validate every m updates
@@ -58,8 +58,8 @@ criterion:
     - masked_pct
 
 optimization:
-  update_freq: [ 2 ]
-  max_update: 729000  # ~ 1 epoch -> 100 epochs would be 729000 updates
+  update_freq: [ 4 ]
+  max_update: 7290  # ~ 1 epoch -> 100 epochs would be 729000 updates
   clip_norm: 1
 
 optimizer:
