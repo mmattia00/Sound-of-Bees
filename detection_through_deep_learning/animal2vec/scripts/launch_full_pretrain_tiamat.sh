@@ -177,16 +177,14 @@ fi
 # STEP 6: Pretraining
 # ==============================================================================
 
+# ==============================================================================
+# STEP 6: Pretraining
+# ==============================================================================
+
 echo ""
 echo "======================================================"
 echo " STEP 6: Avvio pretraining"
 echo "======================================================"
-
-# Variabili d'ambiente — spiegazione:
-#   HF_HOME    = dove HuggingFace scarica/cacha i modelli
-#   TORCH_HOME = dove PyTorch scarica pesi pretrainati
-#   TMPDIR     = cartella per file temporanei di sistema
-# Tutte su CephFS così sopravvivono al pod e non riempiono il container layer
 
 export HYDRA_FULL_ERROR=1
 export HF_HOME=/abyss/home/mattia-montanari/.cache/huggingface
@@ -194,17 +192,13 @@ export TORCH_HOME=/abyss/home/mattia-montanari/.cache/torch
 export TMPDIR=/abyss/home/mattia-montanari/tmp
 
 mkdir -p "$TMPDIR"
-mkdir -p /abyss/home/checkpoints/bee-pretrain-tiamat-2gpu
-mkdir -p /abyss/home/tb_logs/bee-pretrain-tiamat-2gpu
 
-echo "[INFO] Avvio training con config: $CONFIG_DIR/test_pretrain"
-echo "[INFO] Checkpoints -> /abyss/home/checkpoints/bee-pretrain-tiamat-2gpu"
-echo "[INFO] TensorBoard -> /abyss/home/tb_logs/bee-pretrain-tiamat-2gpu"
+echo "[INFO] Avvio training con config: $CONFIG_DIR/full_pretrain_tiamat"
 echo "[INFO] Timestamp avvio: $(date)"
 
 python "$TRAIN_SCRIPT" \
     --config-dir="$CONFIG_DIR" \
-    --config-name=test_pretrain
+    --config-name=full_pretrain_tiamat
 
 echo ""
 echo "======================================================"
