@@ -48,7 +48,7 @@ distributed_training:
 criterion:
   _name: expanded_model
   segmentation_metrics: true
-  use_focal_loss: true  # this overrides label smoothing and uses the focal loss instead
+  use_focal_loss: true
   log_keys:
     - ema_decay
     - target_var
@@ -56,28 +56,24 @@ criterion:
     - model_norm
     - ema_norm
     - masked_pct
+    - loss_scale
+
 
 optimization:
-  update_freq: [ 4 ]
+  lr: [0.00025]
+  update_freq: [4]
   max_update: 7290  # ~ 1 epoch -> 100 epochs would be 729000 updates
   clip_norm: 1
 
 optimizer:
-  _name: composite
-  dynamic_groups: true
-  groups:
-    default:
-      lr_float: 0.00025
-      optimizer:
-        _name: adam
-        adam_betas: [ 0.9,0.98 ]
-        adam_eps: 1e-06
-        weight_decay: 0.01
-      lr_scheduler:
-        _name: cosine
-        warmup_updates: 10000
+  _name: adam
+  adam_betas: [0.9, 0.98]
+  adam_eps: 1e-06
+  weight_decay: 0.01
 
-lr_scheduler: pass_through
+lr_scheduler:
+  _name: cosine
+  warmup_updates: 450                          # ← MODIFICATO: da 500 a 450 (proporzionale al nuovo max_update)
 
 model:
   _name: data2vec_multi
