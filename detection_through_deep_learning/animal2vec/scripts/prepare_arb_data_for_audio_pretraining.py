@@ -201,11 +201,37 @@ def iteration(file, args, id_generator, labels, channel_dict):
                         _new_rand_name = id_generator()
                 random_names_dictionary.update({os.path.join(base_out_filename, _new_rand_name): f_name_base})
                 f_name_base = _new_rand_name
+            # === MODIFICA 5 ===
+            # Originale
+            # else:
+            #     base_out_filename = os.path.dirname(audio_filename).replace(os.sep, "_").replace("-", "_").lower()
+            #     if base_out_filename.startswith("_"):
+            #         base_out_filename = base_out_filename[1:]
+            #     base_out_filename = base_out_filename[len(args.input_folder):]
             else:
-                base_out_filename = os.path.dirname(audio_filename).replace(os.sep, "_").replace("-", "_").lower()
+                input_folder_normalized = (
+                    args.input_folder[0]
+                    .replace(os.sep, "_")
+                    .replace("-", "_")
+                    .replace(":", "")   # rimuove la drive letter Windows
+                    .lower()
+                )
+                base_out_filename = (
+                    os.path.dirname(audio_filename)
+                    .replace(os.sep, "_")
+                    .replace("-", "_")
+                    .replace(":", "")   # rimuove la drive letter Windows
+                    .lower()
+                )
                 if base_out_filename.startswith("_"):
                     base_out_filename = base_out_filename[1:]
-                base_out_filename = base_out_filename[len(args.input_folder):]
+
+                # ora len() è sulla stringa normalizzata, non sulla lista
+                base_out_filename = base_out_filename[len(input_folder_normalized):]
+
+                if base_out_filename.startswith("_"):
+                    base_out_filename = base_out_filename[1:]
+            # === FINE MODIFICA 5 ===
 
             out_folder_wav = os.path.join(out_folder, "wav", "{:05.0f}Hz".format(args.resample_rate),
                                           base_out_filename)
@@ -248,7 +274,9 @@ def iteration(file, args, id_generator, labels, channel_dict):
                         end_time_lbl.append(min(end_time, float(args.segment_length)))
                         end_frame_lbl.append(np.ceil(end_time_lbl[-1] * args.resample_rate).astype(int))
                         lbl.append(file_labels.iloc[lbl_i])
-                        foc.append(1 if file_focal_labels.iloc[lbl_i].lower() == "focal" else 0)
+                        # MODIFICA 6: gestione colonna Focal
+                        # Originale foc.append(1 if file_focal_labels.iloc[lbl_i].lower() == "focal" else 0)
+                        foc.append(int(bool(file_focal_labels.iloc[lbl_i])))
                         lbl_cat.append(args.unique_labels.index(lbl[-1]))
                         total_duration.append(end_time_lbl[-1] - start_time_lbl[-1])
 
