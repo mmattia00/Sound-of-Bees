@@ -19,98 +19,98 @@ DST_WAV="$DST_BASE/wav/24000Hz/byss_home_dataset_raw"
 DST_LBL="$DST_BASE/lbl"
 DST_MANIFEST="$DST_BASE/manifest"
 
-TRAIN_SCRIPT="/abyss/home/Sound-of-Bees/detection_through_deep_learning/animal2vec/animal2vec_train.py"
-CONFIG_DIR="/abyss/home/Sound-of-Bees/detection_through_deep_learning/animal2vec/configs/bees"
+TRAIN_SCRIPT="/abyss/home/timon-nas/Sound-of-Bees/detection_through_deep_learning/animal2vec/animal2vec_train.py"
+CONFIG_DIR="/abyss/home/timon-nas/Sound-of-Bees/detection_through_deep_learning/animal2vec/configs/bees"
 
-# ==============================================================================
-# STEP 0: Crea le cartelle di destinazione
-# ==============================================================================
+# # ==============================================================================
+# # STEP 0: Crea le cartelle di destinazione
+# # ==============================================================================
 
-echo ""
-echo "======================================================"
-echo " STEP 0: Creazione cartelle di destinazione"
-echo "======================================================"
+# echo ""
+# echo "======================================================"
+# echo " STEP 0: Creazione cartelle di destinazione"
+# echo "======================================================"
 
-mkdir -p "$DST_WAV"
-mkdir -p "$DST_LBL"
-mkdir -p "$DST_MANIFEST"
+# mkdir -p "$DST_WAV"
+# mkdir -p "$DST_LBL"
+# mkdir -p "$DST_MANIFEST"
 
-echo "[OK] Cartelle create:"
-echo "     WAV      -> $DST_WAV"
-echo "     LBL      -> $DST_LBL"
-echo "     MANIFEST -> $DST_MANIFEST"
+# echo "[OK] Cartelle create:"
+# echo "     WAV      -> $DST_WAV"
+# echo "     LBL      -> $DST_LBL"
+# echo "     MANIFEST -> $DST_MANIFEST"
 
-# ==============================================================================
-# STEP 1: Copia TUTTI i wav su fast storage
-# ==============================================================================
+# # ==============================================================================
+# # STEP 1: Copia TUTTI i wav su fast storage
+# # ==============================================================================
 
-echo ""
-echo "======================================================"
-echo " STEP 1: Copia wav su fast storage (rsync)"
-echo "======================================================"
-echo "[INFO] Sorgente:     $SRC_WAV"
-echo "[INFO] Destinazione: $DST_WAV"
-echo "[INFO] rsync copierà solo i file mancanti o modificati"
+# echo ""
+# echo "======================================================"
+# echo " STEP 1: Copia wav su fast storage (rsync)"
+# echo "======================================================"
+# echo "[INFO] Sorgente:     $SRC_WAV"
+# echo "[INFO] Destinazione: $DST_WAV"
+# echo "[INFO] rsync copierà solo i file mancanti o modificati"
 
-rsync -avh \
-    --progress \
-    --ignore-errors \
-    --partial \
-    "$SRC_WAV/" \
-    "$DST_WAV/" || true
+# rsync -avh \
+#     --progress \
+#     --ignore-errors \
+#     --partial \
+#     "$SRC_WAV/" \
+#     "$DST_WAV/" || true
 
-echo "[OK] Trasferimento wav completato"
-echo "[INFO] File wav in destinazione:"
-find "$DST_WAV" -name "*.wav" | wc -l
+# echo "[OK] Trasferimento wav completato"
+# echo "[INFO] File wav in destinazione:"
+# find "$DST_WAV" -name "*.wav" | wc -l
 
-# ==============================================================================
-# STEP 2: Copia cartella lbl
-# ==============================================================================
+# # ==============================================================================
+# # STEP 2: Copia cartella lbl
+# # ==============================================================================
 
-echo ""
-echo "======================================================"
-echo " STEP 2: Copia lbl su fast storage (rsync)"
-echo "======================================================"
+# echo ""
+# echo "======================================================"
+# echo " STEP 2: Copia lbl su fast storage (rsync)"
+# echo "======================================================"
 
-rsync -avh \
-    --ignore-errors \
-    "$SRC_LBL/" \
-    "$DST_LBL/" || true
+# rsync -avh \
+#     --ignore-errors \
+#     "$SRC_LBL/" \
+#     "$DST_LBL/" || true
 
-echo "[OK] Trasferimento lbl completato"
+# echo "[OK] Trasferimento lbl completato"
 
-# ==============================================================================
-# STEP 3: Copia manifest pre-esistente
-# ==============================================================================
+# # ==============================================================================
+# # STEP 3: Copia manifest pre-esistente
+# # ==============================================================================
 
-echo ""
-echo "======================================================"
-echo " STEP 3: Copia manifest"
-echo "======================================================"
-echo "[INFO] Copio manifest da: $SRC_MANIFEST"
+# echo ""
+# echo "======================================================"
+# echo " STEP 3: Copia manifest"
+# echo "======================================================"
+# echo "[INFO] Copio manifest da: $SRC_MANIFEST"
 
-rsync -avh \
-    --ignore-errors \
-    "$SRC_MANIFEST/" \
-    "$DST_MANIFEST/" || true
+# rsync -avh \
+#     --ignore-errors \
+#     "$SRC_MANIFEST/" \
+#     "$DST_MANIFEST/" || true
 
-echo "[OK] Manifest copiati:"
-ls -lh "$DST_MANIFEST/"
+# echo "[OK] Manifest copiati:"
+# ls -lh "$DST_MANIFEST/"
 
-# ==============================================================================
-# STEP 4: Verifica spazio
-# ==============================================================================
+# # ==============================================================================
+# # STEP 4: Verifica spazio
+# # ==============================================================================
 
-echo ""
-echo "======================================================"
-echo " STEP 4: Verifica spazio"
-echo "======================================================"
+# echo ""
+# echo "======================================================"
+# echo " STEP 4: Verifica spazio"
+# echo "======================================================"
 
-echo "[INFO] Spazio usato in /local:"
-du -sh /local/*
+# echo "[INFO] Spazio usato in /local:"
+# du -sh /local/*
 
-echo "[INFO] Spazio libero rimanente:"
-df -h /local | tail -1
+# echo "[INFO] Spazio libero rimanente:"
+# df -h /local | tail -1
 
 # ==============================================================================
 # STEP 5: Pretraining

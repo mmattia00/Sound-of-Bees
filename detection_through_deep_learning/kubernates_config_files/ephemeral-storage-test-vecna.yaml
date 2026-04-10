@@ -1,0 +1,71 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  namespace: user-mattia-montanari
+  name: bee-pretrain-vecna
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      nodeName: vecna
+      tolerations:
+        - key: "gpumem"
+          operator: "Equal"
+          value: "32"
+          effect: "NoSchedule"
+      containers:
+      - name: bee-pretrain
+        image: ccu-k8s.inf.uni-konstanz.de:32250/mattia.montanari/animal2vec:v3
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          /bin/bash /abyss/home/Sound-of-Bees/detection_through_deep_learning/animal2vec/scripts/launch_test_vecna.sh
+        resources:
+          requests:
+            cpu: "59"
+            memory: "370Gi"
+            nvidia.com/gpu: "4"
+          limits:
+            cpu: "63"
+            memory: "396Gi"
+            nvidia.com/gpu: "4"
+        volumeMounts:
+          - mountPath: /abyss/home
+            name: cephfs-home
+            readOnly: false
+          - mountPath: /abyss/shared
+            name: cephfs-shared
+            readOnly: false
+          - mountPath: /abyss/datasets
+            name: cephfs-datasets
+            readOnly: true
+          - mountPath: /local
+            name: local-storage
+            readOnly: false
+          - mountPath: /dev/shm
+            name: dshm
+      imagePullSecrets:
+        - name: registry-ro-login
+      volumes:
+        - name: cephfs-home
+          hostPath:
+            path: "/cephfs/abyss/home/mattia-montanari"
+            type: Directory
+        - name: cephfs-shared
+          hostPath:
+            path: "/cephfs/abyss/shared"
+            type: Directory
+        - name: cephfs-datasets
+          hostPath:
+            path: "/cephfs/abyss/datasets"
+            type: Directory
+        - name: local-storage
+          hostPath:
+            path: "/raid/local-data/mattia-montanari"
+            type: DirectoryOrCreate
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Gi
+
