@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: user-mattia-montanari
+  name: bee-finetune-vecna-terminal
+spec:
+  restartPolicy: Never
+  nodeName: vecna
+  containers:
+  - name: bee-terminal
+    image: ccu-k8s.inf.uni-konstanz.de:32250/mattia.montanari/animal2vec:v3
+    command: ["/bin/bash", "-c"]
+    args:
+    - |
+      tail -f /dev/null
+    resources:
+      requests:
+        nvidia.com/gpu: "1"
+        cpu: "16"
+        memory: "32Gi"
+      limits:
+        nvidia.com/gpu: "1"
+        cpu: "16"
+        memory: "32Gi"
+    volumeMounts:
+      - mountPath: /abyss/home
+        name: cephfs-home
+        readOnly: false
+      - mountPath: /abyss/shared
+        name: cephfs-shared
+        readOnly: false
+      - mountPath: /abyss/datasets
+        name: cephfs-datasets
+        readOnly: true
+      - mountPath: /local
+        name: local-storage
+        readOnly: false
+      - mountPath: /dev/shm
+        name: dshm
+      - mountPath: /abyss/home/timon-nas
+        name: samba-share
+        readOnly: false
+  imagePullSecrets:
+    - name: registry-ro-login
+  volumes:
+    - name: cephfs-home
+      hostPath:
+        path: "/cephfs/abyss/home/mattia-montanari"
+        type: Directory
+    - name: cephfs-shared
+      hostPath:
+        path: "/cephfs/abyss/shared"
+        type: Directory
+    - name: cephfs-datasets
+      hostPath:
+        path: "/cephfs/abyss/datasets"
+        type: Directory
+    - name: local-storage
+      hostPath:
+        path: "/raid/local-data/mattia-montanari"
+        type: DirectoryOrCreate
+    - name: dshm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 4Gi
+    - name: samba-share
+      flexVolume:
+        driver: "fstab/cifs"
+        fsType: "cifs"
+        secretRef:
+          name: "cifs-secret"
+        options:
+          networkPath: "//timon.cascb.uni-konstanz.de/A26-03-0300"
+          mountOptions: "vers=3.0,dir_mode=0755,file_mode=0644,noperm,domain=CASCB"

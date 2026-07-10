@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-nas-pod
+  namespace: user-mattia-montanari
+spec:
+  restartPolicy: Never
+  nodeName: tiamat
+  tolerations:
+    - key: "gpumem"
+      operator: "Equal"
+      value: "40"
+      effect: "NoSchedule"
+  containers:
+  - name: debug
+    image: ccu-k8s.inf.uni-konstanz.de:32250/mattia.montanari/animal2vec:v3
+    command: ["sleep", "1d"]
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+    volumeMounts:
+      - mountPath: /abyss/home
+        name: cephfs-home
+        readOnly: false
+      - mountPath: /abyss/shared
+        name: cephfs-shared
+        readOnly: false
+      - mountPath: /abyss/datasets
+        name: cephfs-datasets
+        readOnly: true
+      - mountPath: /local
+        name: local-storage
+        readOnly: false
+      - mountPath: /abyss/home/timon-nas
+        name: samba-share
+        readOnly: false
+  imagePullSecrets:
+    - name: registry-ro-login
+  volumes:
+    - name: cephfs-home
+      hostPath:
+        path: "/cephfs/abyss/home/mattia-montanari"
+        type: Directory
+    - name: cephfs-shared
+      hostPath:
+        path: "/cephfs/abyss/shared"
+        type: Directory
+    - name: cephfs-datasets
+      hostPath:
+        path: "/cephfs/abyss/datasets"
+        type: Directory
+    - name: local-storage
+      hostPath:
+        path: "/raid/local-data/mattia-montanari"
+        type: DirectoryOrCreate
+    - name: samba-share
+      flexVolume:
+        driver: "fstab/cifs"
+        fsType: "cifs"
+        secretRef:
+          name: "cifs-secret"
+        options:
+          networkPath: "//timon.cascb.uni-konstanz.de/A26-03-0300"
+          mountOptions: "vers=3.0,dir_mode=0755,file_mode=0644,noperm,domain=CASCB"

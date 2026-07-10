@@ -1,0 +1,74 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  namespace: user-mattia-montanari
+  name: bee-postprocessing-dsp-job
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: registry-ro-login
+      containers:
+      - name: bee-postprocessing
+        image: ccu-k8s.inf.uni-konstanz.de:32250/mattia.montanari/bee_postprocessing:v4
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          /bin/bash /abyss/home/timon-nas/Sound-of-Bees/postprocessing/run_post_processing_dsp.sh
+        resources:
+          requests:
+            cpu: "32"
+            memory: "250Gi"
+          limits:
+            cpu: "32"
+            memory: "250Gi"
+        volumeMounts:
+          - mountPath: /abyss/home
+            name: cephfs-home
+            readOnly: false
+          - mountPath: /abyss/shared
+            name: cephfs-shared
+            readOnly: false
+          - mountPath: /abyss/datasets
+            name: cephfs-datasets
+            readOnly: true
+          - mountPath: /local
+            name: local-storage
+            readOnly: false
+          - mountPath: /dev/shm
+            name: dshm
+          - mountPath: /abyss/home/timon-nas
+            name: samba-share
+            readOnly: false
+      volumes:
+        - name: cephfs-home
+          hostPath:
+            path: "/cephfs/abyss/home/mattia-montanari"
+            type: Directory
+        - name: cephfs-shared
+          hostPath:
+            path: "/cephfs/abyss/shared"
+            type: Directory
+        - name: cephfs-datasets
+          hostPath:
+            path: "/cephfs/abyss/datasets"
+            type: Directory
+        - name: local-storage
+          hostPath:
+            path: "/raid/local-data/mattia-montanari"
+            type: DirectoryOrCreate
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Gi
+        - name: samba-share
+          flexVolume:
+            driver: "fstab/cifs"
+            fsType: "cifs"
+            secretRef:
+              name: "cifs-secret"
+            options:
+              networkPath: "//timon.cascb.uni-konstanz.de/A26-03-0300"
+              mountOptions: "vers=3.0,dir_mode=0755,file_mode=0644,noperm,domain=CASCB"
